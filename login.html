@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mitglieder-Login</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+</head>
+<body>
+<nav class="nav">
+  <a class="logo" href="index.html"><span class="dot"></span> <span id="brandName">Court Booking</span></a>
+  <div class="links">
+    <a href="index.html">Buchen</a>
+    <a href="konto.html">Mein Konto</a>
+  </div>
+</nav>
+
+<div class="wrap" style="max-width:460px">
+  <div class="page-head" style="text-align:center">
+    <span class="eyebrow" style="justify-content:center">Mitglieder</span>
+    <h1 id="formTitle">Anmelden</h1>
+    <p id="formIntro">Melde dich an, um als Mitglied vergünstigt oder gratis zu buchen.</p>
+  </div>
+
+  <div class="card">
+    <label for="email">E-Mail</label>
+    <input type="email" id="email" placeholder="du@example.com" autocomplete="email">
+    <label for="pw">Passwort</label>
+    <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password">
+    <div id="nameWrap" style="display:none">
+      <label for="fullName">Name (optional)</label>
+      <input type="text" id="fullName" placeholder="Vor- und Nachname">
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <button class="btn btn-primary" id="submitBtn" style="width:100%;margin-top:18px">Anmelden</button>
+
+    <p class="hint" style="text-align:center;margin-top:16px">
+      <span id="toggleText">Noch kein Konto?</span>
+      <a href="#" id="toggleLink" style="color:var(--brand-600);font-weight:600">Registrieren</a>
+    </p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script>
+const sb = window.cbClient();
+const params = new URLSearchParams(location.search);
+const slug = params.get('club') || window.CB_CONFIG.DEFAULT_CLUB;
+let mode = 'signin'; // oder 'signup'
+const $ = s => document.querySelector(s);
+const msg = (t, cls='error') => { const m=$('#msg'); m.className='msg show '+cls; m.textContent=t; };
+
+(async () => {
+  // Bereits eingeloggt? -> zum Konto
+  const { data:{ session } } = await sb.auth.getSession();
+  if (session) location.href = 'konto.html' + location.search;
+
+  const { data:c } = await sb.from('clubs').select('name,primary_color').eq('slug', slug).maybeSingle();
+  if (c) { $('#brandName').textContent = c.name; if (c.primary_color) document.documentElement.style.setProperty('--brand', c.primary_color); }
+})();
+
+$('#toggleLink').addEventListener('click', (e) => {
+  e.preventDefault();
+  mode = mode === 'signin' ? 'signup' : 'signin';
+  const signup = mode === 'signup';
+  $('#formTitle').textContent = signup ? 'Registrieren' : 'Anmelden';
+  $('#formIntro').textContent = signup
+    ? 'Erstelle dein Konto. Mitglieder-Konditionen gelten, sobald dein Club dich freigeschaltet hat.'
+    : 'Melde dich an, um als Mitglied vergünstigt oder gratis zu buchen.';
+  $('#submitBtn').textContent = signup ? 'Konto erstellen' : 'Anmelden';
+  $('#nameWrap').style.display = signup ? 'block' : 'none';
+  $('#toggleText').textContent = signup ? 'Schon registriert?' : 'Noch kein Konto?';
+  $('#toggleLink').textContent = signup ? 'Anmelden' : 'Registrieren';
+  $('#msg').className = 'msg';
+});
+
+$('#submitBtn').addEventListener('click', submit);
+$('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+
+async function submit() {
+  const email = $('#email').value.trim(), pw = $('#pw').value;
+  if (!email || !pw) { msg('Bitte E-Mail und Passwort eingeben.'); return; }
+  $('#submitBtn').disabled = true;
+
+  if (mode === 'signup') {
+    const { data, error } = await sb.auth.signUp({ email, password: pw });
+    if (error) { msg(error.message); $('#submitBtn').disabled = false; return; }
+    // Falls Mitglied dieser E-Mail existiert: auth_uid verknüpfen (falls RLS erlaubt)
+    if (data.user) {
+      await sb.from('members').update({ auth_uid: data.user.id })
+        .eq('email', email).is('auth_uid', null);
+    }
+    if (!data.session) { msg('Konto erstellt. Bitte E-Mail bestätigen und dann anmelden.', 'ok'); $('#submitBtn').disabled = false; mode='signin'; return; }
+    location.href = 'konto.html' + location.search;
+  } else {
+    const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) { msg('Anmeldung fehlgeschlagen: ' + error.message); $('#submitBtn').disabled = false; return; }
+    location.href = 'konto.html' + location.search;
+  }
+}
+</script>
+</body>
+</html>

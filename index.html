@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Platz buchen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+</head>
+<body>
+<nav class="nav">
+  <a class="logo" href="index.html"><span class="dot"></span> <span id="brandName">Court Booking</span></a>
+  <div class="links">
+    <a href="index.html" class="active">Buchen</a>
+    <a href="konto.html">Mein Konto</a>
+    <a href="login.html" class="btn btn-ghost btn-sm">Mitglieder-Login</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="page-head">
+    <span class="eyebrow">Platzreservierung</span>
+    <h1 id="clubTitle">Platz buchen</h1>
+  </div>
+
+  <div class="bk-toolbar">
+    <div class="seg" id="viewSeg">
+      <button data-view="day" class="active">Tag</button>
+      <button data-view="week">Woche</button>
+    </div>
+    <div class="bk-nav">
+      <button id="prevBtn" title="Zurück">‹</button>
+      <div class="bk-date" id="dateLabel">—</div>
+      <button id="nextBtn" title="Weiter">›</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="todayBtn">Heute</button>
+    <input type="date" id="jump" style="width:auto">
+    <div style="flex:1"></div>
+    <select id="weekCourt" style="width:auto;display:none"></select>
+    <div class="seg" id="envSeg">
+      <button data-env="all" class="active">Alle</button>
+      <button data-env="outdoor">Outdoor</button>
+      <button data-env="indoor">Indoor</button>
+    </div>
+    <span id="memberBadge" class="badge member" style="display:none">✓ Mitglied</span>
+  </div>
+
+  <div class="bk-legend">
+    <span><i class="free"></i> frei</span>
+    <span><i class="busy"></i> belegt</span>
+    <span><i class="mine"></i> meine Buchung</span>
+  </div>
+
+  <div id="msg" class="msg"></div>
+  <div id="gridHost"></div>
+</div>
+
+<!-- Buchungs-Modal -->
+<div class="modal-backdrop" id="bookModal">
+  <div class="modal">
+    <h2>Buchung bestätigen</h2>
+    <p class="sub" id="bookSummary"></p>
+    <div id="guestFields">
+      <label for="gName">Name</label>
+      <input type="text" id="gName" placeholder="Vor- und Nachname">
+      <label for="gMail">E-Mail</label>
+      <input type="email" id="gMail" placeholder="du@example.com">
+    </div>
+    <div id="bookMsg" class="msg"></div>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="btn btn-ghost" id="bookCancel" style="flex:1">Abbrechen</button>
+      <button class="btn btn-primary" id="bookConfirm" style="flex:1">Buchen</button>
+    </div>
+  </div>
+</div>
+
+<footer class="foot">
+  <span>© <span id="yr"></span> Court Booking</span>
+  <span>Teil der Core-Management-Produktfamilie</span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+$('#yr').textContent = new Date().getFullYear();
+const sb = window.cbClient();
+const params = new URLSearchParams(location.search);
+const slug = params.get('club') || window.CB_CONFIG.DEFAULT_CLUB;
+const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+const MON = ['Jan','Feb','März','Apr','Mai','Juni','Juli','Aug','Sep','Okt','Nov','Dez'];
+
+let club=null, courts=[], hours=[], busy=[], mine=[], myMember=null, session=null;
+let view='day', envFilter='all', anchor=new Date(), weekCourtId=null, pending=null;
+
+const msg=(t,cls='error')=>{const m=$('#msg');m.className='msg show '+cls;m.textContent=t;};
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const toMin=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};
+const fromMin=m=>`${pad(Math.floor(m/60))}:${pad(m%60)}`;
+const fmtHM=d=>`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function startOfWeek(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;} // Montag
+function openingFor(wd){return hours.find(h=>h.weekday===wd)||null;}
+
+init();
+
+async function init(){
+  anchor.setHours(0,0,0,0);
+  const { data:{ session:s } } = await sb.auth.getSession();
+  session=s;
+
+  const { data:c, error } = await sb.from('clubs').select('*').eq('slug',slug).eq('active',true).maybeSingle();
+  if(error||!c){msg('Club „'+slug+'" nicht gefunden.');return;}
+  club=c;
+  document.title='Platz buchen – '+club.name;
+  $('#brandName').textContent=club.name; $('#clubTitle').textContent=club.name;
+  if(club.primary_color) document.documentElement.style.setProperty('--brand',club.primary_color);
+
+  if(session?.user?.email){
+    const { data:m }=await sb.from('members').select('*').eq('club_id',club.id).ilike('email',session.user.email).eq('active',true).maybeSingle();
+    if(m){myMember=m;$('#memberBadge').style.display='inline-flex';$('#guestFields').style.display='none';}
+  }
+
+  const [{data:co},{data:oh}]=await Promise.all([
+    sb.from('courts').select('*').eq('club_id',club.id).eq('active',true).order('sort'),
+    sb.from('opening_hours').select('*').eq('club_id',club.id),
+  ]);
+  courts=co||[]; hours=oh||[]; weekCourtId=courts[0]?.id||null;
+  $('#weekCourt').innerHTML=courts.map(c=>`<option value="${c.id}">${c.name} · ${c.environment==='indoor'?'Indoor':'Outdoor'}</option>`).join('');
+
+  // Events
+  $('#viewSeg').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
+    $('#viewSeg').querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+    view=b.dataset.view;
+    $('#weekCourt').style.display=view==='week'?'inline-block':'none';
+    $('#envSeg').style.display=view==='week'?'none':'inline-flex';
+    loadRange();
+  });
+  $('#envSeg').querySelectorAll('[data-env]').forEach(b=>b.onclick=()=>{
+    $('#envSeg').querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+    envFilter=b.dataset.env; render();
+  });
+  $('#weekCourt').onchange=e=>{weekCourtId=e.target.value; render();};
+  $('#prevBtn').onclick=()=>{anchor.setDate(anchor.getDate()-(view==='week'?7:1));loadRange();};
+  $('#nextBtn').onclick=()=>{anchor.setDate(anchor.getDate()+(view==='week'?7:1));loadRange();};
+  $('#todayBtn').onclick=()=>{anchor=new Date();anchor.setHours(0,0,0,0);loadRange();};
+  $('#jump').onchange=e=>{if(e.target.value){anchor=new Date(e.target.value+'T00:00:00');loadRange();}};
+  $('#bookCancel').onclick=()=>$('#bookModal').classList.remove('open');
+  $('#bookConfirm').onclick=confirmBooking;
+
+  await loadRange();
+
+  // Rückkehr von Stripe
+  if(params.get('paid')) msg('Zahlung erfolgreich – deine Buchung ist bestätigt. Danke! 🎾','ok');
+  else if(params.get('cancelled')) msg('Zahlung abgebrochen – die Reservierung wird in Kürze wieder freigegeben.','info');
+  if(params.get('paid')||params.get('cancelled')){
+    const u=new URL(location.href); u.searchParams.delete('paid'); u.searchParams.delete('cancelled');
+    history.replaceState({},'',u);
+  }
+}
+
+async function loadRange(){
+  $('#msg').className='msg';
+  $('#jump').value=ymd(anchor);
+  let start,end;
+  if(view==='week'){start=startOfWeek(anchor);end=new Date(start);end.setDate(end.getDate()+7);}
+  else{start=new Date(anchor);end=new Date(anchor);end.setDate(end.getDate()+1);}
+
+  const { data:b }=await sb.from('court_busy').select('*')
+    .eq('club_id',club.id).gte('start_at',start.toISOString()).lt('start_at',end.toISOString());
+  busy=(b||[]).map(x=>({court_id:x.court_id,s:new Date(x.start_at).getTime(),e:new Date(x.end_at).getTime()}));
+
+  mine=[];
+  if(myMember){
+    const { data:mb }=await sb.from('bookings').select('court_id,start_at,end_at')
+      .gte('start_at',start.toISOString()).lt('start_at',end.toISOString()).neq('status','cancelled');
+    mine=(mb||[]).map(x=>({court_id:x.court_id,s:new Date(x.start_at).getTime(),e:new Date(x.end_at).getTime()}));
+  }
+  render();
+}
+
+function overlaps(list,courtId,s,e){return list.some(iv=>iv.court_id===courtId&&iv.s<e&&iv.e>s);}
+function cellStatus(courtId,s,e){
+  const now=Date.now();
+  if(overlaps(mine,courtId,s,e)) return 'mine';
+  if(overlaps(busy,courtId,s,e)) return 'busy';
+  if(e<=now) return 'closed';
+  return 'free';
+}
+
+function render(){
+  const host=$('#gridHost'); host.innerHTML='';
+  if(view==='week') renderWeek(host); else renderDay(host);
+}
+
+function renderDay(host){
+  $('#dateLabel').textContent=`${WD[anchor.getDay()]}, ${anchor.getDate()}. ${MON[anchor.getMonth()]} ${anchor.getFullYear()}`;
+  const oh=openingFor(anchor.getDay());
+  if(!oh||oh.closed){host.innerHTML='<div class="card"><p class="sub">An diesem Tag geschlossen.</p></div>';return;}
+  const cols=courts.filter(c=>envFilter==='all'||c.environment===envFilter);
+  if(!cols.length){host.innerHTML='<div class="card"><p class="sub">Keine Plätze in dieser Kategorie.</p></div>';return;}
+
+  const step=club.slot_minutes, open=toMin(oh.open_time.slice(0,5)), close=toMin(oh.close_time.slice(0,5));
+  const dstr=ymd(anchor);
+  let head=`<tr><th class="col-time">Zeit</th>`+cols.map(c=>
+    `<th>${c.name}<span class="env ${c.environment}">${c.environment==='indoor'?'Indoor':'Outdoor'}</span></th>`).join('')+`</tr>`;
+  let body='';
+  for(let m=open;m+step<=close;m+=step){
+    body+=`<tr><td class="col-time">${fromMin(m)}</td>`;
+    for(const c of cols){
+      const s=new Date(`${dstr}T${fromMin(m)}:00`).getTime(), e=s+step*60000;
+      const st=cellStatus(c.id,s,e);
+      const label=st==='mine'?'meine':st==='busy'?'belegt':st==='free'?'':'–';
+      body+=`<td class="bk-cell ${st}" ${st==='free'?`data-book="${c.id}|${s}|${e}"`:''}>${label}</td>`;
+    }
+    body+=`</tr>`;
+  }
+  host.innerHTML=`<div class="grid-scroll"><table class="bk-grid"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+  wireCells(cols);
+}
+
+function renderWeek(host){
+  const start=startOfWeek(anchor), days=[...Array(7)].map((_,i)=>{const d=new Date(start);d.setDate(d.getDate()+i);return d;});
+  const last=days[6];
+  $('#dateLabel').textContent=`${start.getDate()}. ${MON[start.getMonth()]} – ${last.getDate()}. ${MON[last.getMonth()]}`;
+  const court=courts.find(c=>c.id===weekCourtId)||courts[0];
+  if(!court){host.innerHTML='<div class="card"><p class="sub">Keine Plätze.</p></div>';return;}
+
+  // Zeitbereich = weiteste Öffnung über die Woche
+  let open=24*60, close=0, any=false;
+  days.forEach(d=>{const oh=openingFor(d.getDay());if(oh&&!oh.closed){any=true;open=Math.min(open,toMin(oh.open_time.slice(0,5)));close=Math.max(close,toMin(oh.close_time.slice(0,5)));}});
+  if(!any){host.innerHTML='<div class="card"><p class="sub">Diese Woche geschlossen.</p></div>';return;}
+  const step=club.slot_minutes;
+
+  let head=`<tr><th class="col-time">Zeit</th>`+days.map(d=>
+    `<th>${WD[d.getDay()]}<span class="env" style="color:var(--muted)">${d.getDate()}.${d.getMonth()+1}</span></th>`).join('')+`</tr>`;
+  let body='';
+  for(let m=open;m+step<=close;m+=step){
+    body+=`<tr><td class="col-time">${fromMin(m)}</td>`;
+    for(const d of days){
+      const oh=openingFor(d.getDay());
+      const inside=oh&&!oh.closed&&m>=toMin(oh.open_time.slice(0,5))&&m+step<=toMin(oh.close_time.slice(0,5));
+      if(!inside){body+=`<td class="bk-cell closed"></td>`;continue;}
+      const s=new Date(`${ymd(d)}T${fromMin(m)}:00`).getTime(), e=s+step*60000;
+      const st=cellStatus(court.id,s,e);
+      const label=st==='mine'?'meine':st==='busy'?'belegt':'';
+      body+=`<td class="bk-cell ${st}" ${st==='free'?`data-book="${court.id}|${s}|${e}"`:''}>${label}</td>`;
+    }
+    body+=`</tr>`;
+  }
+  host.innerHTML=`<div class="grid-scroll"><table class="bk-grid"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+  wireCells(courts);
+}
+
+function wireCells(courtPool){
+  document.querySelectorAll('[data-book]').forEach(td=>td.onclick=()=>{
+    const [cid,s,e]=td.dataset.book.split('|');
+    const court=courtPool.find(c=>c.id===cid)||courts.find(c=>c.id===cid);
+    openBooking(court,new Date(+s),new Date(+e));
+  });
+}
+
+function openBooking(court,s,e){
+  pending={court,s,e};
+  const isMember=!!myMember, minutes=(e-s)/60000;
+  const price=window.CB.priceFor(court,club,minutes,isMember);
+  $('#bookSummary').innerHTML=
+    `<b>${court.name}</b> · ${court.environment==='indoor'?'Indoor':'Outdoor'}<br>`+
+    `${WD[s.getDay()]} ${s.getDate()}.${s.getMonth()+1}., ${fmtHM(s)}–${fmtHM(e)}<br>`+
+    `Preis: <b>${window.CB.money(price,club.currency)}</b>`+
+    (isMember&&club.member_pricing_mode==='free'?' (Mitglied – gratis)':isMember?' (Mitglieder-Preis)':'');
+  $('#bookMsg').className='msg';
+  $('#bookModal').classList.add('open');
+}
+
+async function confirmBooking(){
+  const {court,s,e}=pending, bm=$('#bookMsg');
+  let name=null,mail=null;
+  if(!myMember){name=$('#gName').value.trim();mail=$('#gMail').value.trim();
+    if(!name||!mail){bm.className='msg show error';bm.textContent='Bitte Name und E-Mail angeben.';return;}}
+  $('#bookConfirm').disabled=true;
+  const {data,error}=await sb.rpc('create_booking',{p_club_slug:slug,p_court:court.id,
+    p_start:s.toISOString(),p_end:e.toISOString(),p_guest_name:name,p_guest_email:mail});
+  $('#bookConfirm').disabled=false;
+  if(error){bm.className='msg show error';bm.textContent=error.message;return;}
+
+  // Bezahlpflichtig -> zu Stripe weiterleiten
+  if(data.price>0 && data.status==='pending'){
+    bm.className='msg show info'; bm.textContent='Weiterleitung zur Zahlung…';
+    $('#bookConfirm').disabled=true;
+    const { data:co, error:ce } = await sb.functions.invoke('create-checkout',{ body:{ booking_id:data.id }});
+    if(co?.url){ window.location.href=co.url; return; }
+    $('#bookConfirm').disabled=false;
+    bm.className='msg show error'; bm.textContent=(co&&co.error)||ce?.message||'Zahlung konnte nicht gestartet werden.';
+    return;
+  }
+
+  $('#bookModal').classList.remove('open');
+  msg('Buchung bestätigt! '+fmtHM(s)+'–'+fmtHM(e),'ok');
+  loadRange();
+}
+</script>
+</body>
+</html>

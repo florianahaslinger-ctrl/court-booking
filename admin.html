@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Club-Verwaltung</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+</head>
+<body>
+<nav class="nav">
+  <a class="logo" href="admin.html"><span class="dot"></span> <span id="brandName">Club-Verwaltung</span></a>
+  <div class="links">
+    <a href="index.html">Buchungsseite</a>
+    <select id="clubPick" style="display:none;width:auto;padding:7px 10px"></select>
+    <a href="#" id="logoutBtn" class="btn btn-ghost btn-sm">Abmelden</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="page-head">
+    <span class="eyebrow" id="roleBadge">Club-Admin</span>
+    <h1 id="clubTitle">Verwaltung</h1>
+    <p>Alles konfigurierbar: Plätze, Öffnungszeiten, Slot-Länge, Preise, Mitglieder, Abos, Sperren.</p>
+  </div>
+
+  <div id="gate" class="msg"></div>
+
+  <div id="app" style="display:none">
+    <div class="stat-grid" id="stats"></div>
+
+    <div class="tabs">
+      <button data-tab="belegung" class="active">Belegung</button>
+      <button data-tab="platze">Plätze</button>
+      <button data-tab="zeiten">Öffnungszeiten &amp; Slot</button>
+      <button data-tab="preise">Preise &amp; Mitglieder-Regeln</button>
+      <button data-tab="mitglieder">Mitglieder</button>
+      <button data-tab="abos">Abos</button>
+      <button data-tab="zahlungen">Zahlungen</button>
+      <button data-tab="clubs" id="clubsTab" style="display:none">Clubs</button>
+    </div>
+
+    <!-- BELEGUNG: Buchungen ansehen, sperren, gratis eintragen -->
+    <div class="tabpane active" id="tab-belegung">
+      <div class="card">
+        <h2>Platz sperren / Gratis-Buchung eintragen</h2>
+        <span class="sub">Sperre einen Platz (Wartung/Turnier) oder trage eine kostenlose Buchung ein.</span>
+        <div class="field-row" style="margin-top:12px">
+          <div><label>Platz</label><select id="bkCourt"></select></div>
+          <div><label>Art</label><select id="bkKind"><option value="block">Sperre</option><option value="free">Gratis-Buchung</option></select></div>
+          <div><label>Datum</label><input type="date" id="bkDate"></div>
+          <div><label>Von</label><input type="time" id="bkFrom" value="18:00"></div>
+          <div><label>Bis</label><input type="time" id="bkTo" value="19:00"></div>
+        </div>
+        <div class="field-row">
+          <div style="flex:1 1 100%"><label>Notiz / Name (optional)</label><input type="text" id="bkNote" placeholder="z.B. Wartung, oder Gastname bei Gratis-Buchung"></div>
+        </div>
+        <div id="bkMsg" class="msg"></div>
+        <button class="btn btn-primary" id="bkAdd" style="margin-top:14px">Eintragen</button>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+          <h2 style="flex:1">Buchungen</h2>
+          <input type="date" id="listDate" style="width:auto">
+        </div>
+        <div class="table-scroll">
+          <table class="data" id="bookTable">
+            <thead><tr><th>Zeit</th><th>Platz</th><th>Art</th><th>Wer</th><th>Preis</th><th>Status</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLÄTZE -->
+    <div class="tabpane" id="tab-platze">
+      <div class="card">
+        <h2>Neuer Platz</h2>
+        <div class="field-row" style="margin-top:10px">
+          <div><label>Name</label><input type="text" id="ncName" placeholder="Platz 3 / Halle B"></div>
+          <div><label>Art</label><select id="ncEnv"><option value="outdoor">Outdoor</option><option value="indoor">Indoor</option></select></div>
+          <div><label>Belag</label><select id="ncSurface"><option value="clay">Sand</option><option value="hard">Hart</option><option value="carpet">Teppich</option><option value="grass">Rasen</option></select></div>
+          <div><label>Preis / Std (€)</label><input type="number" id="ncPrice" value="16" min="0" step="0.5"></div>
+        </div>
+        <button class="btn btn-primary" id="ncAdd" style="margin-top:12px">Platz hinzufügen</button>
+      </div>
+      <div class="card"><div id="courtList"></div></div>
+    </div>
+
+    <!-- ÖFFNUNGSZEITEN & SLOT -->
+    <div class="tabpane" id="tab-zeiten">
+      <div class="card">
+        <h2>Slot-Länge</h2>
+        <span class="sub">Wie lang ist ein buchbarer Zeitblock?</span>
+        <div class="field-row" style="margin-top:10px;align-items:flex-end">
+          <div style="flex:0 0 200px"><label>Minuten pro Slot</label>
+            <select id="slotMin"><option>30</option><option>45</option><option>60</option><option>90</option><option>120</option></select></div>
+          <button class="btn btn-primary" id="saveSlot">Speichern</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Öffnungszeiten</h2>
+        <span class="sub">Pro Wochentag. Haken = geschlossen.</span>
+        <div class="table-scroll" style="margin-top:12px">
+          <table class="data"><thead><tr><th>Tag</th><th>Offen ab</th><th>Bis</th><th>Geschlossen</th></tr></thead>
+          <tbody id="hoursRows"></tbody></table>
+        </div>
+        <button class="btn btn-primary" id="saveHours" style="margin-top:14px">Öffnungszeiten speichern</button>
+      </div>
+    </div>
+
+    <!-- PREISE & MITGLIEDER-REGELN -->
+    <div class="tabpane" id="tab-preise">
+      <div class="card">
+        <h2>Mitglieder-Preismodell</h2>
+        <div class="field-row" style="margin-top:10px">
+          <div><label>Modell</label>
+            <select id="mpMode">
+              <option value="free">Mitglieder gratis</option>
+              <option value="discount">Mitglieder mit Rabatt</option>
+              <option value="full">Mitglieder zahlen voll</option>
+            </select></div>
+          <div id="discWrap"><label>Rabatt (%)</label><input type="number" id="mpDisc" value="50" min="0" max="100"></div>
+          <div id="freeWrap"><label>Max. Std bei Gratis</label><input type="number" id="mpFree" value="5" min="1" step="0.5"></div>
+        </div>
+        <div class="field-row">
+          <div><label>Währung</label><input type="text" id="mpCur" value="EUR"></div>
+          <div><label>Markenfarbe</label><input type="color" id="mpColor" value="#2E8B57" style="height:44px;padding:4px"></div>
+          <div><label>Vorausbuchbar (Tage)</label><input type="number" id="mpOpenDays" value="14" min="1"></div>
+          <div><label>Stornofrist (Std)</label><input type="number" id="mpCancel" value="24" min="0"></div>
+        </div>
+        <div id="prMsg" class="msg"></div>
+        <button class="btn btn-primary" id="savePricing" style="margin-top:12px">Speichern</button>
+        <p class="hint">Platzpreise (Indoor/Outdoor) legst du pro Platz im Reiter „Plätze" fest.</p>
+      </div>
+    </div>
+
+    <!-- MITGLIEDER -->
+    <div class="tabpane" id="tab-mitglieder">
+      <div class="card">
+        <h2>Mitglied hinzufügen</h2>
+        <span class="sub">Mitglied wird per E-Mail freigeschaltet. Login erstellt die Person selbst mit derselben E-Mail.</span>
+        <div class="field-row" style="margin-top:10px">
+          <div><label>E-Mail</label><input type="email" id="nmMail" placeholder="mitglied@example.com"></div>
+          <div><label>Name</label><input type="text" id="nmName"></div>
+          <div><label>Gültig bis (optional)</label><input type="date" id="nmValid"></div>
+        </div>
+        <div id="nmMsg" class="msg"></div>
+        <button class="btn btn-primary" id="nmAdd" style="margin-top:12px">Hinzufügen</button>
+      </div>
+      <div class="card"><div class="table-scroll"><table class="data" id="memberTable">
+        <thead><tr><th>Name</th><th>E-Mail</th><th>Status</th><th>Gültig bis</th><th></th></tr></thead><tbody></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- ABOS -->
+    <div class="tabpane" id="tab-abos">
+      <div class="card">
+        <h2>Abo anlegen (fixer Slot)</h2>
+        <span class="sub">Mitglied bekommt automatisch einen wiederkehrenden Wochenslot.</span>
+        <div class="field-row" style="margin-top:10px">
+          <div><label>Mitglied</label><select id="abMember"></select></div>
+          <div><label>Platz</label><select id="abCourt"></select></div>
+          <div><label>Wochentag</label><select id="abWd"><option value="1">Mo</option><option value="2">Di</option><option value="3">Mi</option><option value="4">Do</option><option value="5">Fr</option><option value="6">Sa</option><option value="0">So</option></select></div>
+          <div><label>Uhrzeit</label><input type="time" id="abTime" value="18:00"></div>
+          <div><label>Dauer (Min)</label><input type="number" id="abDur" value="60" min="30" step="15"></div>
+        </div>
+        <div class="field-row">
+          <div><label>Von</label><input type="date" id="abFrom"></div>
+          <div><label>Bis</label><input type="date" id="abTo"></div>
+        </div>
+        <div id="abMsg" class="msg"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-primary" id="abAdd">Abo anlegen</button>
+          <button class="btn btn-ghost" id="abGen">Abo-Buchungen jetzt erzeugen</button>
+        </div>
+        <p class="hint">Wiederkehrende Buchungen werden automatisch täglich für die nächsten 3 Wochen erzeugt. „Jetzt erzeugen" macht es sofort.</p>
+      </div>
+      <div class="card"><div class="table-scroll"><table class="data" id="aboTable">
+        <thead><tr><th>Mitglied</th><th>Slot</th><th>Platz</th><th>Zeitraum</th><th></th></tr></thead><tbody></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- ZAHLUNGEN (Stripe Connect) -->
+    <div class="tabpane" id="tab-zahlungen">
+      <div class="card">
+        <h2>Online-Zahlungen (Stripe)</h2>
+        <span class="sub">Damit Gäste online bezahlen und du deine Auszahlungen direkt auf dein Konto bekommst.</span>
+        <div id="stripeStatus" style="margin:14px 0"></div>
+        <div id="zaMsg" class="msg"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="stripeConnectBtn">Zahlungen einrichten</button>
+          <button class="btn btn-ghost" id="stripeStatusBtn">Status prüfen</button>
+        </div>
+        <p class="hint">Stripe führt dich durch die Verifizierung (Firmen-/Kontodaten). Danach werden Gäste-Zahlungen automatisch deinem Club gutgeschrieben.</p>
+      </div>
+    </div>
+
+    <!-- CLUBS (nur Head-Admin) -->
+    <div class="tabpane" id="tab-clubs">
+      <div class="card">
+        <h2>Neuen Club anlegen</h2>
+        <span class="sub">Ein neuer Tennisplatz als Mandant. Der Club-Admin verwaltet danach nur seinen Club.</span>
+        <div class="field-row" style="margin-top:10px">
+          <div><label>Name</label><input type="text" id="ncClubName" placeholder="TC Musterstadt"></div>
+          <div><label>Kürzel (URL-Slug)</label><input type="text" id="ncClubSlug" placeholder="tc-musterstadt"></div>
+          <div><label>Admin-E-Mail</label><input type="email" id="ncClubOwner" placeholder="admin@tcmusterstadt.at"></div>
+        </div>
+        <div id="clubMsg" class="msg"></div>
+        <button class="btn btn-primary" id="ncClubAdd" style="margin-top:12px">Club anlegen</button>
+        <p class="hint">Buchungsseite danach: <code>index.html?club=SLUG</code>. Der Admin registriert sich mit der E-Mail (login.html) und verwaltet seinen Club.</p>
+      </div>
+      <div class="card"><div class="table-scroll"><table class="data" id="clubsTable">
+        <thead><tr><th>Club</th><th>Slug</th><th>Admin</th><th>Plätze</th><th>Zahlungen</th><th>Aktiv</th></tr></thead><tbody></tbody>
+      </table></div></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script>
+const sb = window.cbClient();
+const params = new URLSearchParams(location.search);
+const $ = s => document.querySelector(s);
+const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+let me = null, isHead = false, club = null, courts = [], members = [];
+
+init();
+
+async function init() {
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) { location.href = 'login.html'; return; }
+  const email = session.user.email;
+
+  const { data:admin } = await sb.from('app_admins').select('*').ilike('email', email).maybeSingle();
+  if (!admin) { $('#gate').className='msg show error'; $('#gate').textContent = 'Kein Admin-Zugang für ' + email + '. Bitte mit einem Admin-Konto anmelden.'; return; }
+  me = admin; isHead = admin.role === 'head_admin';
+  $('#roleBadge').textContent = isHead ? 'Head-Admin' : 'Club-Admin';
+  if(isHead) $('#clubsTab').style.display='';
+
+  // Welche Clubs? Head sieht alle, Club-Admin nur seinen.
+  let clubs = [];
+  if (isHead) {
+    const { data } = await sb.from('clubs').select('*').order('name');
+    clubs = data || [];
+    const sel = $('#clubPick'); sel.style.display='inline-block';
+    sel.innerHTML = clubs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    const wanted = params.get('club');
+    if (wanted) { const c = clubs.find(x=>x.slug===wanted); if (c) sel.value = c.id; }
+    sel.addEventListener('change', ()=> selectClub(clubs.find(c=>c.id===sel.value)));
+  } else {
+    const { data } = await sb.from('clubs').select('*').eq('id', admin.club_id).maybeSingle();
+    clubs = data ? [data] : [];
+  }
+  if (!clubs.length) { $('#gate').className='msg show info'; $('#gate').textContent='Noch kein Club zugeordnet.'; return; }
+
+  $('#logoutBtn').addEventListener('click', async e=>{ e.preventDefault(); await sb.auth.signOut(); location.href='login.html'; });
+  document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tabpane').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); $('#tab-'+b.dataset.tab).classList.add('active');
+  }));
+  wireActions();
+  selectClub(isHead ? clubs.find(c=>c.id===$('#clubPick').value)||clubs[0] : clubs[0]);
+}
+
+async function selectClub(c) {
+  club = c;
+  $('#app').style.display='block';
+  $('#clubTitle').textContent = club.name;
+  $('#brandName').textContent = club.name;
+  if (club.primary_color) document.documentElement.style.setProperty('--brand', club.primary_color);
+  const today = new Date().toISOString().slice(0,10);
+  $('#bkDate').value = today; $('#listDate').value = today;
+  $('#abFrom').value = today;
+
+  // Settings in Formulare
+  $('#slotMin').value = club.slot_minutes;
+  $('#mpMode').value = club.member_pricing_mode;
+  $('#mpDisc').value = club.member_discount_percent;
+  $('#mpFree').value = (club.member_free_max_minutes/60);
+  $('#mpCur').value = club.currency;
+  $('#mpColor').value = club.primary_color || '#2E8B57';
+  $('#mpOpenDays').value = club.booking_open_days;
+  $('#mpCancel').value = Math.round(club.cancel_lead_minutes/60);
+  togglePricingFields();
+
+  await Promise.all([loadCourts(), loadHours(), loadMembers()]);
+  loadBookings(); loadAbos(); loadStats();
+  refreshStripeStatus(false);
+  if(isHead) loadClubsTable();
+  if(params.get('stripe')==='return'){
+    document.querySelector('[data-tab="zahlungen"]').click();
+    refreshStripeStatus(true);
+    const u=new URL(location.href); u.searchParams.delete('stripe'); history.replaceState({},'',u);
+  }
+}
+
+// ---------- Stats ----------
+async function loadStats() {
+  const { count:bCount } = await sb.from('bookings').select('*',{count:'exact',head:true}).eq('club_id',club.id).gte('end_at',new Date().toISOString()).neq('status','cancelled');
+  const active = members.filter(m=>m.active).length;
+  $('#stats').innerHTML = `
+    <div class="stat"><div class="k">Plätze</div><div class="v">${courts.length}</div><div class="s">${courts.filter(c=>c.environment==='indoor').length} Indoor · ${courts.filter(c=>c.environment==='outdoor').length} Outdoor</div></div>
+    <div class="stat"><div class="k">Mitglieder</div><div class="v">${active}</div><div class="s">von ${members.length} gesamt</div></div>
+    <div class="stat"><div class="k">Offene Buchungen</div><div class="v">${bCount||0}</div><div class="s">ab heute</div></div>
+    <div class="stat"><div class="k">Slot-Länge</div><div class="v">${club.slot_minutes}′</div><div class="s">${({free:'Mitglieder gratis',discount:club.member_discount_percent+'% Rabatt',full:'voller Preis'})[club.member_pricing_mode]}</div></div>`;
+}
+
+// ---------- Plätze ----------
+async function loadCourts() {
+  const { data } = await sb.from('courts').select('*').eq('club_id',club.id).order('sort');
+  courts = data || [];
+  const opts = courts.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  $('#bkCourt').innerHTML = opts; $('#abCourt').innerHTML = opts;
+  $('#courtList').innerHTML = courts.length ? courts.map(c=>`
+    <div class="field-row" style="align-items:center;border-bottom:1px solid var(--line);padding:10px 0">
+      <div style="flex:2"><b>${c.name}</b></div>
+      <div><span class="badge" style="${c.environment==='indoor'?'color:var(--indoor);background:rgba(59,125,216,.1)':'color:var(--outdoor);background:rgba(224,138,43,.12)'}">${c.environment==='indoor'?'Indoor':'Outdoor'}</span></div>
+      <div class="sub">${c.surface}</div>
+      <div style="flex:0 0 130px"><input type="number" value="${c.price_per_hour}" step="0.5" min="0" data-price="${c.id}" style="padding:7px"></div>
+      <div style="flex:0 0 auto"><button class="btn btn-ghost btn-sm" data-savecourt="${c.id}">✓</button>
+        <button class="btn btn-danger btn-sm" data-delcourt="${c.id}">Löschen</button></div>
+    </div>`).join('') : '<p class="sub">Noch keine Plätze.</p>';
+  $('#courtList').querySelectorAll('[data-savecourt]').forEach(b=>b.onclick=async()=>{
+    const price = $(`[data-price="${b.dataset.savecourt}"]`).value;
+    await sb.from('courts').update({price_per_hour:price}).eq('id',b.dataset.savecourt); loadCourts(); loadStats();
+  });
+  $('#courtList').querySelectorAll('[data-delcourt]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Platz wirklich löschen? Bestehende Buchungen dieses Platzes werden ebenfalls entfernt.')) return;
+    await sb.from('courts').delete().eq('id',b.dataset.delcourt); loadCourts(); loadStats();
+  });
+}
+
+// ---------- Öffnungszeiten ----------
+async function loadHours() {
+  const { data } = await sb.from('opening_hours').select('*').eq('club_id',club.id);
+  const map = {}; (data||[]).forEach(h=>map[h.weekday]=h);
+  let rows='';
+  for (let i=1;i<=7;i++){ const wd=i%7; const h=map[wd]||{open_time:'08:00',close_time:'22:00',closed:false};
+    rows+=`<tr data-wd="${wd}"><td>${WD[wd]}</td>
+      <td><input type="time" value="${(h.open_time||'08:00').slice(0,5)}" data-open="${wd}" style="padding:7px"></td>
+      <td><input type="time" value="${(h.close_time||'22:00').slice(0,5)}" data-close="${wd}" style="padding:7px"></td>
+      <td><input type="checkbox" data-closed="${wd}" ${h.closed?'checked':''} style="width:auto"></td></tr>`; }
+  $('#hoursRows').innerHTML = rows;
+}
+
+// ---------- Mitglieder ----------
+async function loadMembers() {
+  const { data } = await sb.from('members').select('*').eq('club_id',club.id).order('created_at',{ascending:false});
+  members = data || [];
+  $('#abMember').innerHTML = members.map(m=>`<option value="${m.id}">${m.full_name||m.email}</option>`).join('');
+  $('#memberTable tbody').innerHTML = members.length ? members.map(m=>`
+    <tr><td>${m.full_name||'—'}</td><td>${m.email}</td>
+      <td>${m.active?'<span class="badge ok">aktiv</span>':'<span class="badge bad">inaktiv</span>'}</td>
+      <td>${m.valid_until? new Date(m.valid_until).toLocaleDateString('de-AT'):'—'}</td>
+      <td><button class="btn btn-ghost btn-sm" data-toggle="${m.id}" data-a="${m.active}">${m.active?'Deaktivieren':'Aktivieren'}</button>
+          <button class="btn btn-danger btn-sm" data-delm="${m.id}">Löschen</button></td></tr>`).join('')
+    : '<tr><td colspan="5" class="sub">Noch keine Mitglieder.</td></tr>';
+  $('#memberTable').querySelectorAll('[data-toggle]').forEach(b=>b.onclick=async()=>{
+    await sb.from('members').update({active: b.dataset.a!=='true'}).eq('id',b.dataset.toggle); loadMembers(); loadStats(); });
+  $('#memberTable').querySelectorAll('[data-delm]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Mitglied löschen?')) return; await sb.from('members').delete().eq('id',b.dataset.delm); loadMembers(); loadStats(); });
+}
+
+// ---------- Buchungen ----------
+async function loadBookings() {
+  const day = $('#listDate').value;
+  const s=new Date(day+'T00:00:00'), e=new Date(day+'T23:59:59');
+  const { data } = await sb.from('bookings').select('*, court:courts(name)')
+    .eq('club_id',club.id).gte('start_at',s.toISOString()).lte('start_at',e.toISOString()).order('start_at');
+  const st={pending:'<span class="badge warn">offen</span>',confirmed:'<span class="badge ok">ok</span>',cancelled:'<span class="badge bad">storniert</span>'};
+  const kd={guest:'Gast',member:'Mitglied',free:'Gratis',block:'Sperre',subscription:'Abo'};
+  $('#bookTable tbody').innerHTML = (data&&data.length)? data.map(b=>{
+    const t1=new Date(b.start_at),t2=new Date(b.end_at);
+    return `<tr><td>${t1.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}–${t2.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}</td>
+      <td>${b.court?.name||''}</td><td>${kd[b.kind]||b.kind}</td>
+      <td>${b.guest_name||b.guest_email||(b.member_id?'Mitglied':'')||b.note||'—'}</td>
+      <td>${window.CB.money(b.price,club.currency)}</td><td>${st[b.status]||b.status}</td>
+      <td><button class="btn btn-danger btn-sm" data-cancel="${b.id}">Stornieren</button></td></tr>`;}).join('')
+    : '<tr><td colspan="7" class="sub">Keine Buchungen an diesem Tag.</td></tr>';
+  $('#bookTable').querySelectorAll('[data-cancel]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Buchung stornieren?')) return;
+    await sb.from('bookings').update({status:'cancelled'}).eq('id',b.dataset.cancel); loadBookings(); loadStats(); });
+}
+
+// ---------- Abos ----------
+async function loadAbos() {
+  const { data } = await sb.from('subscriptions').select('*, court:courts(name), member:members(full_name,email)')
+    .eq('club_id',club.id).order('weekday');
+  $('#aboTable tbody').innerHTML = (data&&data.length)? data.map(a=>`
+    <tr><td>${a.member?.full_name||a.member?.email||'—'}</td>
+      <td>${WD[a.weekday]} ${a.start_time.slice(0,5)} · ${a.duration_minutes}′</td>
+      <td>${a.court?.name||''}</td>
+      <td>${new Date(a.valid_from).toLocaleDateString('de-AT')}–${new Date(a.valid_until).toLocaleDateString('de-AT')}</td>
+      <td><button class="btn btn-danger btn-sm" data-delabo="${a.id}">Löschen</button></td></tr>`).join('')
+    : '<tr><td colspan="5" class="sub">Keine Abos.</td></tr>';
+  $('#aboTable').querySelectorAll('[data-delabo]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Abo löschen? Künftige Abo-Buchungen werden ebenfalls entfernt.')) return;
+    await sb.from('bookings').delete().eq('subscription_id',b.dataset.delabo).gte('start_at',new Date().toISOString());
+    await sb.from('subscriptions').delete().eq('id',b.dataset.delabo); loadAbos(); loadBookings(); });
+}
+
+function togglePricingFields(){
+  const m=$('#mpMode').value;
+  $('#discWrap').style.display = m==='discount'?'block':'none';
+  $('#freeWrap').style.display = m==='free'?'block':'none';
+}
+
+// ---------- Aktionen verdrahten ----------
+function wireActions() {
+  $('#mpMode').addEventListener('change', togglePricingFields);
+  $('#listDate').addEventListener('change', loadBookings);
+
+  $('#ncAdd').onclick = async () => {
+    const name=$('#ncName').value.trim(); if(!name) return;
+    await sb.from('courts').insert({club_id:club.id, name, environment:$('#ncEnv').value, surface:$('#ncSurface').value,
+      price_per_hour:$('#ncPrice').value, sort:courts.length+1});
+    $('#ncName').value=''; loadCourts(); loadStats();
+  };
+
+  $('#saveSlot').onclick = async () => {
+    await sb.from('clubs').update({slot_minutes:parseInt($('#slotMin').value)}).eq('id',club.id);
+    club.slot_minutes=parseInt($('#slotMin').value); loadStats(); flash('#prMsg','Slot-Länge gespeichert.','ok');
+  };
+
+  $('#saveHours').onclick = async () => {
+    const rows=[...document.querySelectorAll('#hoursRows tr')].map(tr=>{const wd=+tr.dataset.wd;
+      return {club_id:club.id, weekday:wd, open_time:$(`[data-open="${wd}"]`).value, close_time:$(`[data-close="${wd}"]`).value, closed:$(`[data-closed="${wd}"]`).checked};});
+    await sb.from('opening_hours').upsert(rows,{onConflict:'club_id,weekday'});
+    flash('#prMsg','Öffnungszeiten gespeichert.','ok');
+  };
+
+  $('#savePricing').onclick = async () => {
+    const upd={ member_pricing_mode:$('#mpMode').value, member_discount_percent:+$('#mpDisc').value,
+      member_free_max_minutes:Math.round(+$('#mpFree').value*60), currency:$('#mpCur').value.trim().toUpperCase(),
+      primary_color:$('#mpColor').value, booking_open_days:+$('#mpOpenDays').value, cancel_lead_minutes:Math.round(+$('#mpCancel').value*60) };
+    const { error } = await sb.from('clubs').update(upd).eq('id',club.id);
+    if(error){flash('#prMsg',error.message,'error');return;}
+    Object.assign(club,upd); document.documentElement.style.setProperty('--brand',club.primary_color);
+    loadStats(); flash('#prMsg','Einstellungen gespeichert.','ok');
+  };
+
+  $('#nmAdd').onclick = async () => {
+    const email=$('#nmMail').value.trim(); if(!email){flash('#nmMsg','E-Mail nötig.','error');return;}
+    const { error } = await sb.from('members').insert({club_id:club.id, email, full_name:$('#nmName').value.trim()||null, valid_until:$('#nmValid').value||null});
+    if(error){flash('#nmMsg',error.message,'error');return;}
+    $('#nmMail').value='';$('#nmName').value='';$('#nmValid').value=''; loadMembers(); loadStats(); flash('#nmMsg','Mitglied hinzugefügt.','ok');
+  };
+
+  $('#bkAdd').onclick = async () => {
+    const d=$('#bkDate').value; const start=new Date(`${d}T${$('#bkFrom').value}`), end=new Date(`${d}T${$('#bkTo').value}`);
+    if(end<=start){flash('#bkMsg','Endzeit muss nach Startzeit liegen.','error');return;}
+    const kind=$('#bkKind').value;
+    const { error } = await sb.from('bookings').insert({club_id:club.id, court_id:$('#bkCourt').value, kind,
+      status:'confirmed', start_at:start.toISOString(), end_at:end.toISOString(), price:0, payment_status:'none',
+      note:$('#bkNote').value.trim()||null, guest_name:kind==='free'?($('#bkNote').value.trim()||null):null});
+    if(error){flash('#bkMsg', error.message.includes('overlap')||error.code==='23P01'?'Zeitraum überschneidet sich mit einer bestehenden Buchung.':error.message,'error');return;}
+    flash('#bkMsg', kind==='block'?'Platz gesperrt.':'Gratis-Buchung eingetragen.','ok'); loadBookings(); loadStats();
+  };
+
+  $('#abAdd').onclick = async () => {
+    if(!members.length){flash('#abMsg','Zuerst ein Mitglied anlegen.','error');return;}
+    const { error } = await sb.from('subscriptions').insert({club_id:club.id, member_id:$('#abMember').value, court_id:$('#abCourt').value,
+      weekday:+$('#abWd').value, start_time:$('#abTime').value, duration_minutes:+$('#abDur').value,
+      valid_from:$('#abFrom').value, valid_until:$('#abTo').value});
+    if(error){flash('#abMsg',error.message,'error');return;}
+    const { data:n } = await sb.rpc('generate_my_subscriptions',{p_club:club.id});
+    flash('#abMsg','Abo angelegt – '+(n||0)+' Buchung(en) erzeugt.','ok'); loadAbos(); loadBookings();
+  };
+
+  $('#abGen').onclick = async () => {
+    const { data:n, error } = await sb.rpc('generate_my_subscriptions',{p_club:club.id});
+    if(error){flash('#abMsg',error.message,'error');return;}
+    flash('#abMsg',(n||0)+' Abo-Buchung(en) für die nächsten 3 Wochen erzeugt.','ok'); loadBookings();
+  };
+
+  // Stripe Connect
+  $('#stripeConnectBtn').onclick = async () => {
+    $('#stripeConnectBtn').disabled=true; flash('#zaMsg','Verbinde mit Stripe…','info');
+    const { data, error } = await sb.functions.invoke('connect-onboard',{ body:{ action:'link', club_id:club.id }});
+    if(data?.url){ location.href=data.url; return; }
+    $('#stripeConnectBtn').disabled=false;
+    flash('#zaMsg',(data&&data.error)||error?.message||'Stripe-Verbindung fehlgeschlagen.','error');
+  };
+  $('#stripeStatusBtn').onclick = ()=>refreshStripeStatus(true);
+
+  // Neuen Club anlegen (Head-Admin)
+  $('#ncClubAdd').onclick = async () => {
+    const name=$('#ncClubName').value.trim();
+    const slug=$('#ncClubSlug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
+    const owner=$('#ncClubOwner').value.trim().toLowerCase();
+    if(!name||!slug||!owner){flash('#clubMsg','Name, Slug und Admin-E-Mail sind nötig.','error');return;}
+    const { data:nc, error } = await sb.from('clubs').insert({slug,name,owner_email:owner}).select().single();
+    if(error){flash('#clubMsg',error.message.includes('duplicate')?'Slug bereits vergeben.':error.message,'error');return;}
+    await sb.from('app_admins').upsert({email:owner,role:'club_admin',club_id:nc.id},{onConflict:'email'});
+    const rows=[]; for(let wd=0;wd<7;wd++) rows.push({club_id:nc.id,weekday:wd,open_time:'08:00',close_time:'22:00',closed:false});
+    await sb.from('opening_hours').insert(rows);
+    $('#ncClubName').value='';$('#ncClubSlug').value='';$('#ncClubOwner').value='';
+    flash('#clubMsg','Club „'+name+'" angelegt. Buchungsseite: index.html?club='+slug,'ok');
+    // Club-Auswahl oben aktualisieren
+    const opt=document.createElement('option'); opt.value=nc.id; opt.textContent=name; $('#clubPick').appendChild(opt);
+    loadClubsTable();
+  };
+}
+
+async function refreshStripeStatus(withMsg){
+  const box=$('#stripeStatus');
+  box.innerHTML='<span class="sub">Status wird geprüft…</span>';
+  const { data, error } = await sb.functions.invoke('connect-onboard',{ body:{ action:'status', club_id:club.id }});
+  if(error||(data&&data.error)){ box.innerHTML='<span class="badge bad">Fehler</span>'; if(withMsg) flash('#zaMsg',(data&&data.error)||error.message,'error'); return; }
+  club.stripe_enabled=!!data.chargesEnabled;
+  if(data.chargesEnabled){
+    box.innerHTML='<span class="badge ok">✓ Aktiv</span> Gäste können online bezahlen; Auszahlungen laufen auf dein Stripe-Konto.';
+    $('#stripeConnectBtn').textContent='Stripe-Konto verwalten';
+  } else if(data.hasAccount){
+    box.innerHTML='<span class="badge warn">Verifizierung offen</span> Stripe-Konto verbunden, aber noch nicht freigeschaltet.';
+    $('#stripeConnectBtn').textContent='Einrichtung fortsetzen';
+  } else {
+    box.innerHTML='<span class="badge">Nicht eingerichtet</span> Noch keine Online-Zahlung – Gäste können aktuell nicht online buchen.';
+    $('#stripeConnectBtn').textContent='Zahlungen einrichten';
+  }
+  if(withMsg) flash('#zaMsg','Status aktualisiert.','ok');
+}
+
+async function loadClubsTable(){
+  const [{data:cl},{data:co},{data:ad}]=await Promise.all([
+    sb.from('clubs').select('*').order('name'),
+    sb.from('courts').select('club_id'),
+    sb.from('app_admins').select('email,club_id,role'),
+  ]);
+  const courtCount={}; (co||[]).forEach(c=>courtCount[c.club_id]=(courtCount[c.club_id]||0)+1);
+  $('#clubsTable tbody').innerHTML=(cl||[]).map(c=>{
+    const pay=c.stripe_enabled?'<span class="badge ok">aktiv</span>':c.stripe_account_id?'<span class="badge warn">offen</span>':'<span class="badge">–</span>';
+    return `<tr><td><b>${c.name}</b></td><td><code>${c.slug}</code></td><td class="sub">${c.owner_email}</td>
+      <td>${courtCount[c.id]||0}</td><td>${pay}</td>
+      <td>${c.active?'<span class="badge ok">ja</span>':'<span class="badge bad">nein</span>'}</td></tr>`;
+  }).join('')||'<tr><td colspan="6" class="sub">Keine Clubs.</td></tr>';
+}
+
+function flash(sel,txt,cls){const m=$(sel);m.className='msg show '+cls;m.textContent=txt;setTimeout(()=>{m.className='msg';},4000);}
+</script>
+</body>
+</html>

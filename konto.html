@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mein Konto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+</head>
+<body>
+<nav class="nav">
+  <a class="logo" href="index.html"><span class="dot"></span> <span id="brandName">Court Booking</span></a>
+  <div class="links">
+    <a href="index.html">Buchen</a>
+    <a href="konto.html" class="active">Mein Konto</a>
+    <a href="#" id="logoutBtn" class="btn btn-ghost btn-sm">Abmelden</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="page-head">
+    <span class="eyebrow">Mein Konto</span>
+    <h1 id="hello">Willkommen</h1>
+    <p id="memberLine">—</p>
+  </div>
+
+  <div id="msg" class="msg"></div>
+
+  <div class="card">
+    <h2>Kommende Buchungen</h2>
+    <span class="sub">Deine reservierten Plätze.</span>
+    <div class="table-scroll" style="margin-top:14px">
+      <table class="data" id="bookTable">
+        <thead><tr><th>Datum</th><th>Zeit</th><th>Platz</th><th>Art</th><th>Preis</th><th>Status</th></tr></thead>
+        <tbody><tr><td colspan="6" class="sub">Lädt…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" id="aboCard">
+    <h2>Mein Abo</h2>
+    <span class="sub">Fixer Slot, automatisch für dich reserviert.</span>
+    <div id="aboBody" style="margin-top:12px"><p class="sub">Lädt…</p></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script>
+const sb = window.cbClient();
+const params = new URLSearchParams(location.search);
+const slug = params.get('club') || window.CB_CONFIG.DEFAULT_CLUB;
+const $ = s => document.querySelector(s);
+const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+let club = null, member = null;
+
+init();
+
+async function init() {
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) { location.href = 'login.html' + location.search; return; }
+  const email = session.user.email;
+
+  const { data:c } = await sb.from('clubs').select('*').eq('slug', slug).maybeSingle();
+  club = c;
+  if (club) { $('#brandName').textContent = club.name; if (club.primary_color) document.documentElement.style.setProperty('--brand', club.primary_color); }
+
+  $('#hello').textContent = 'Hallo, ' + email;
+
+  // Mitglied dieses Clubs?
+  const { data:m } = await sb.from('members').select('*')
+    .eq('club_id', club.id).ilike('email', email).maybeSingle();
+  member = m;
+  if (member && member.active) {
+    let mode = ({free:'gratis', discount:club.member_discount_percent+'% Rabatt', full:'zum vollen Preis'})[club.member_pricing_mode];
+    $('#memberLine').innerHTML = `<span class="badge member">✓ Aktives Mitglied</span> — du buchst ${mode}.`;
+  } else if (member) {
+    $('#memberLine').innerHTML = `<span class="badge warn">Mitgliedschaft inaktiv</span> — bitte an den Club wenden.`;
+  } else {
+    $('#memberLine').innerHTML = `<span class="badge">Gast-Konto</span> — noch nicht als Mitglied freigeschaltet. Buchungen zum vollen Preis.`;
+  }
+
+  loadBookings();
+  loadAbo();
+
+  $('#logoutBtn').addEventListener('click', async (e)=>{ e.preventDefault(); await sb.auth.signOut(); location.href='login.html'+location.search; });
+}
+
+async function loadBookings() {
+  const tb = $('#bookTable tbody');
+  const { data, error } = await sb.from('bookings')
+    .select('*, court:courts(name,environment)')
+    .gte('end_at', new Date().toISOString())
+    .order('start_at');
+  if (error) { tb.innerHTML = `<tr><td colspan="6" class="sub">${error.message}</td></tr>`; return; }
+  if (!data.length) { tb.innerHTML = `<tr><td colspan="6" class="sub">Keine kommenden Buchungen. <a href="index.html${location.search}" style="color:var(--brand-600);font-weight:600">Jetzt buchen →</a></td></tr>`; return; }
+
+  const st = { pending:'<span class="badge warn">offen</span>', confirmed:'<span class="badge ok">bestätigt</span>', cancelled:'<span class="badge bad">storniert</span>' };
+  tb.innerHTML = data.map(b => {
+    const s = new Date(b.start_at), e = new Date(b.end_at);
+    return `<tr>
+      <td>${s.toLocaleDateString('de-AT',{weekday:'short',day:'2-digit',month:'2-digit',year:'2-digit'})}</td>
+      <td>${s.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}–${e.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}</td>
+      <td>${b.court?.name||''} <span class="sub">(${b.court?.environment==='indoor'?'Indoor':'Outdoor'})</span></td>
+      <td>${({guest:'Gast',member:'Mitglied',free:'Gratis',block:'Sperre',subscription:'Abo'})[b.kind]||b.kind}</td>
+      <td>${window.CB.money(b.price, club.currency)}</td>
+      <td>${st[b.status]||b.status}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadAbo() {
+  const body = $('#aboBody');
+  if (!member) { body.innerHTML = '<p class="sub">Kein Abo (nur für Mitglieder).</p>'; return; }
+  const { data } = await sb.from('subscriptions').select('*, court:courts(name,environment)')
+    .eq('member_id', member.id).eq('active', true).order('weekday');
+  if (!data || !data.length) { body.innerHTML = '<p class="sub">Aktuell kein Abo hinterlegt.</p>'; return; }
+  body.innerHTML = data.map(a => {
+    const end = new Date(a.start_time + 'Z'); // nur zur Zeitformatierung
+    return `<div class="card" style="box-shadow:none;border-color:var(--brand);background:var(--brand-50)">
+      <b>Jeden ${WD[a.weekday]}, ${a.start_time.slice(0,5)} Uhr</b> · ${a.duration_minutes} Min · ${a.court?.name||''}
+      <div class="sub">Gültig ${new Date(a.valid_from).toLocaleDateString('de-AT')} – ${new Date(a.valid_until).toLocaleDateString('de-AT')}</div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>

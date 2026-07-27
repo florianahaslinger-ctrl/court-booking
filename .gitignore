@@ -1,0 +1,4 @@
+# temporäre Dateien
+mig_payload.json
+mig*.json
+*.log

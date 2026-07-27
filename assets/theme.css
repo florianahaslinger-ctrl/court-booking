@@ -1,0 +1,224 @@
+/* ============================================================
+   COURT BOOKING – Helles Design-System
+   Frische, luftige Tennis-Palette (Court-Grün + Sand + Weiß).
+   Farben pro Club via --brand überschreibbar.
+   ============================================================ */
+:root{
+  /* Marken-/Akzentfarbe (pro Club überschreibbar) */
+  --brand:        #2E8B57;   /* Court-Grün */
+  --brand-dark:   #24704594;
+  --brand-600:    #26794b;
+  --brand-50:     #eaf6ef;
+
+  /* Neutralbasis – hell */
+  --bg:           #f6f8f7;   /* Seitengrund */
+  --surface:      #ffffff;   /* Karten */
+  --surface-2:    #f0f3f2;   /* dezente Flächen */
+  --line:         #e2e8e5;   /* Rahmen */
+  --line-strong:  #cdd6d1;
+
+  --ink:          #17211c;   /* Haupttext */
+  --ink-soft:     #48564f;   /* Sekundärtext */
+  --muted:        #7c8a83;   /* Hinweise */
+
+  /* Zusatz-Akzente */
+  --indoor:       #3b7dd8;   /* Indoor-Plätze */
+  --outdoor:      #e08a2b;   /* Outdoor-Plätze (Sand/Asche) */
+  --ok:           #2f9e5f;
+  --warn:         #d9902f;
+  --bad:          #d1483f;
+
+  --radius:       14px;
+  --radius-sm:    9px;
+  --shadow:       0 1px 2px rgba(16,32,24,.05), 0 12px 32px -18px rgba(16,32,24,.22);
+  --shadow-lg:    0 24px 60px -28px rgba(16,32,24,.35);
+  --ring:         0 0 0 3px rgba(46,139,87,.18);
+  --font:         'Inter','DM Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --font-display: 'Poppins','Inter',system-ui,sans-serif;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:
+    radial-gradient(900px 500px at 90% -10%, rgba(46,139,87,.08), transparent 60%),
+    radial-gradient(700px 500px at -5% 0%, rgba(59,125,216,.06), transparent 55%),
+    var(--bg);
+  color:var(--ink);font-family:var(--font);font-weight:400;line-height:1.6;
+  min-height:100vh;-webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;line-height:1.15;letter-spacing:-.01em}
+::selection{background:var(--brand-50);color:var(--brand-600)}
+
+/* ---------- Navigation ---------- */
+.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:24px;
+  padding:14px 5vw;background:rgba(255,255,255,.82);backdrop-filter:blur(12px) saturate(1.1);
+  border-bottom:1px solid var(--line)}
+.nav .logo{font-family:var(--font-display);font-weight:700;font-size:20px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
+.nav .logo .dot{width:12px;height:12px;border-radius:50%;background:var(--brand);
+  box-shadow:0 0 0 4px var(--brand-50)}
+.nav .links{display:flex;gap:22px;margin-left:auto;align-items:center;font-size:14.5px}
+.nav .links a{color:var(--ink-soft);transition:color .18s}
+.nav .links a:hover,.nav .links a.active{color:var(--brand-600)}
+
+/* ---------- Buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;
+  cursor:pointer;font-family:var(--font);font-size:14.5px;font-weight:600;letter-spacing:.01em;
+  padding:11px 20px;border-radius:var(--radius-sm);transition:transform .15s,box-shadow .2s,background .2s,border-color .2s;white-space:nowrap}
+.btn-primary{background:var(--brand);color:#fff;box-shadow:0 8px 18px -10px rgba(46,139,87,.7)}
+.btn-primary:hover{background:var(--brand-600);transform:translateY(-1px);box-shadow:0 12px 22px -10px rgba(46,139,87,.8)}
+.btn-primary:active{transform:translateY(0)}
+.btn-ghost{background:var(--surface);color:var(--ink);border-color:var(--line-strong)}
+.btn-ghost:hover{background:var(--surface-2);border-color:var(--brand)}
+.btn-sm{padding:7px 13px;font-size:13.5px}
+.btn-danger{background:#fff;color:var(--bad);border-color:rgba(209,72,63,.45)}
+.btn-danger:hover{background:rgba(209,72,63,.08)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* ---------- Layout ---------- */
+.wrap{max-width:1160px;margin:0 auto;padding:44px 5vw}
+.page-head{margin-bottom:30px}
+.page-head .eyebrow{display:inline-flex;align-items:center;gap:9px;color:var(--brand-600);font-size:12px;
+  font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px}
+.page-head h1{font-size:clamp(28px,4.4vw,44px)}
+.page-head p{color:var(--ink-soft);max-width:620px;margin-top:8px;font-size:16px}
+
+/* ---------- Karten ---------- */
+@keyframes cardIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:24px;box-shadow:var(--shadow);animation:cardIn .4s ease both}
+.card + .card{margin-top:18px}
+.card h2{font-size:20px;margin-bottom:4px}
+.card .sub{color:var(--muted);font-size:14px}
+
+/* ---------- Court-Kacheln (Indoor/Outdoor) ---------- */
+.court-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.court-tile{position:relative;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--radius);padding:18px 18px 16px;box-shadow:var(--shadow);
+  transition:transform .2s,border-color .2s,box-shadow .2s}
+.court-tile:hover{transform:translateY(-3px);border-color:var(--brand);box-shadow:var(--shadow-lg)}
+.court-tile .env{position:absolute;top:14px;right:14px;font-size:11px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;padding:4px 9px;border-radius:20px}
+.court-tile .env.indoor{color:var(--indoor);background:rgba(59,125,216,.1)}
+.court-tile .env.outdoor{color:var(--outdoor);background:rgba(224,138,43,.12)}
+.court-tile .cname{font-family:var(--font-display);font-weight:600;font-size:18px}
+.court-tile .cprice{color:var(--ink-soft);font-size:14px;margin-top:2px}
+
+/* ---------- Zeitraster (Slots) ---------- */
+.slot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.slot{border:1px solid var(--line-strong);border-radius:var(--radius-sm);padding:10px 6px;text-align:center;
+  font-size:13.5px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--ink);
+  transition:all .14s}
+.slot:hover:not(.taken){border-color:var(--brand);background:var(--brand-50);color:var(--brand-600)}
+.slot.sel{background:var(--brand);border-color:var(--brand);color:#fff}
+.slot.taken{background:var(--surface-2);color:var(--muted);cursor:not-allowed;border-style:dashed}
+
+/* ---------- Buchungs-Raster (Tennis04-Stil) ---------- */
+.bk-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.bk-nav{display:inline-flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);padding:3px}
+.bk-nav button{background:none;border:none;cursor:pointer;font-size:18px;line-height:1;color:var(--ink-soft);padding:6px 12px;border-radius:6px;transition:background .15s}
+.bk-nav button:hover{background:var(--surface-2);color:var(--brand-600)}
+.bk-date{font-family:var(--font-display);font-weight:600;font-size:16px;min-width:190px;text-align:center}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:3px}
+.seg button{background:none;border:none;cursor:pointer;font-family:var(--font);font-weight:600;font-size:14px;color:var(--ink-soft);padding:7px 16px;border-radius:6px;transition:all .15s}
+.seg button.active{background:var(--brand);color:#fff;box-shadow:0 4px 10px -5px rgba(46,139,87,.7)}
+.bk-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-soft);margin:2px 0 16px}
+.bk-legend span{display:inline-flex;align-items:center;gap:6px}
+.bk-legend i{width:15px;height:15px;border-radius:4px;border:1px solid var(--line-strong);display:inline-block}
+.bk-legend i.free{background:#fff}
+.bk-legend i.busy{background:#fbe4e2;border-color:#e3a49e}
+.bk-legend i.mine{background:var(--brand);border-color:var(--brand)}
+.bk-legend i.blocked{background:repeating-linear-gradient(45deg,#e6e6e6 0 5px,#f4f4f4 5px 10px)}
+
+.grid-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow)}
+table.bk-grid{border-collapse:separate;border-spacing:0;width:100%;min-width:520px}
+table.bk-grid th,table.bk-grid td{border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+table.bk-grid th:last-child,table.bk-grid td:last-child{border-right:none}
+table.bk-grid thead th{position:sticky;top:0;z-index:3;background:var(--surface-2);padding:10px 8px;font-size:13px;
+  font-family:var(--font-display);font-weight:600;color:var(--ink);text-align:center;white-space:nowrap}
+table.bk-grid thead th .env{display:block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-top:2px}
+table.bk-grid thead th .env.indoor{color:var(--indoor)} table.bk-grid thead th .env.outdoor{color:var(--outdoor)}
+.col-time{position:sticky;left:0;z-index:2;background:var(--surface-2);color:var(--ink-soft);font-size:12.5px;font-weight:600;
+  text-align:right;padding:0 10px;white-space:nowrap;width:66px;min-width:66px}
+thead .col-time{z-index:4}
+.bk-cell{height:38px;text-align:center;font-size:12px;padding:0 4px;cursor:pointer;transition:background .12s;color:var(--ink-soft);user-select:none}
+.bk-cell.free{background:#fff}
+.bk-cell.free:hover{background:var(--brand-50);box-shadow:inset 0 0 0 2px var(--brand);color:var(--brand-600);font-weight:600}
+.bk-cell.busy{background:#fbe4e2;color:#b23a31;cursor:not-allowed;font-weight:600;
+  background-image:repeating-linear-gradient(45deg,rgba(178,58,49,.09) 0 7px,transparent 7px 14px)}
+.bk-cell.mine{background:var(--brand);color:#fff;font-weight:600;cursor:default}
+.bk-cell.blocked{cursor:not-allowed;color:var(--muted);
+  background:repeating-linear-gradient(45deg,#e9e9e9 0 6px,#f5f5f5 6px 12px)}
+.bk-cell.closed{background:var(--surface-2);cursor:default}
+.bk-cell.sel{background:var(--brand-600);color:#fff;font-weight:700}
+
+/* ---------- Formulare ---------- */
+label{display:block;font-size:12.5px;font-weight:600;letter-spacing:.02em;color:var(--ink-soft);margin:14px 0 6px}
+input[type=text],input[type=email],input[type=number],input[type=password],
+input[type=datetime-local],input[type=date],input[type=time],textarea,select{
+  width:100%;background:#fff;border:1px solid var(--line-strong);border-radius:var(--radius-sm);
+  color:var(--ink);padding:11px 13px;font-family:var(--font);font-size:15px;transition:border-color .18s,box-shadow .18s}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand);box-shadow:var(--ring)}
+.field-row{display:flex;gap:12px;flex-wrap:wrap}
+.field-row>div{flex:1 1 170px}
+.hint{font-size:12.5px;color:var(--muted);margin-top:5px}
+
+/* ---------- Badges ---------- */
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;letter-spacing:.03em;
+  text-transform:uppercase;padding:4px 10px;border-radius:20px;border:1px solid transparent}
+.badge.ok{color:var(--ok);background:rgba(47,158,95,.1)}
+.badge.warn{color:var(--warn);background:rgba(217,144,47,.12)}
+.badge.bad{color:var(--bad);background:rgba(209,72,63,.1)}
+.badge.member{color:var(--brand-600);background:var(--brand-50)}
+
+/* ---------- Meldungen ---------- */
+.msg{padding:11px 15px;border-radius:var(--radius-sm);font-size:14px;margin:12px 0;display:none}
+.msg.show{display:block}
+.msg.error{background:rgba(209,72,63,.08);border:1px solid rgba(209,72,63,.35);color:#a13129}
+.msg.ok{background:rgba(47,158,95,.09);border:1px solid rgba(47,158,95,.35);color:#1d6b40}
+.msg.info{background:var(--brand-50);border:1px solid rgba(46,139,87,.3);color:var(--brand-600)}
+
+/* ---------- Tabellen (Admin) ---------- */
+table.data{width:100%;border-collapse:collapse;font-size:14px}
+table.data th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;
+  text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+table.data td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.data tr:hover td{background:var(--surface-2)}
+.table-scroll{overflow-x:auto}
+
+/* ---------- Stat-Kacheln (Dashboard) ---------- */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:24px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.stat .k{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.stat .v{font-family:var(--font-display);font-weight:700;font-size:32px;color:var(--ink);margin-top:3px}
+.stat .s{font-size:12.5px;color:var(--muted)}
+
+/* ---------- Tabs ---------- */
+.tabs{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:22px}
+.tabs button{background:none;border:none;color:var(--ink-soft);font-family:var(--font);font-size:14.5px;font-weight:600;
+  padding:11px 16px;cursor:pointer;border-bottom:2px solid transparent;transition:color .18s,border-color .18s}
+.tabs button:hover{color:var(--ink)}
+.tabs button.active{color:var(--brand-600);border-bottom-color:var(--brand)}
+.tabpane{display:none}
+.tabpane.active{display:block;animation:cardIn .35s ease both}
+
+/* ---------- Modal ---------- */
+@keyframes modalIn{from{opacity:0;transform:translateY(12px) scale(.99)}to{opacity:1;transform:none}}
+.modal-backdrop{position:fixed;inset:0;background:rgba(23,33,28,.42);backdrop-filter:blur(4px);
+  display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal-backdrop.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);max-width:460px;width:100%;
+  padding:28px;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:modalIn .25s ease both}
+.modal h2{font-size:22px;margin-bottom:4px}
+
+footer.foot{border-top:1px solid var(--line);margin-top:60px;padding:26px 5vw;color:var(--muted);
+  font-size:13px;display:flex;gap:14px;flex-wrap:wrap;justify-content:space-between}
+footer.foot a:hover{color:var(--brand-600)}
+
+@media(max-width:640px){
+  .wrap{padding:32px 5vw}
+  .nav{flex-wrap:wrap;gap:10px 18px}
+  .nav .links{margin-left:0;width:100%;gap:16px}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
