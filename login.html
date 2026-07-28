@@ -30,8 +30,8 @@
     <label for="pw">Passwort</label>
     <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password">
     <div id="nameWrap" style="display:none">
-      <label for="fullName">Name (optional)</label>
-      <input type="text" id="fullName" placeholder="Vor- und Nachname">
+      <label for="fullName">Name</label>
+      <input type="text" id="fullName" placeholder="Vor- und Nachname" autocomplete="name">
     </div>
 
     <div id="msg" class="msg"></div>
@@ -88,7 +88,9 @@ async function submit() {
   $('#submitBtn').disabled = true;
 
   if (mode === 'signup') {
-    const { data, error } = await sb.auth.signUp({ email, password: pw });
+    const name = $('#fullName').value.trim();
+    if (!name) { msg('Bitte gib deinen Namen ein.'); $('#submitBtn').disabled = false; return; }
+    const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { full_name: name } } });
     if (error) { msg(error.message); $('#submitBtn').disabled = false; return; }
     // Falls Mitglied dieser E-Mail existiert: auth_uid verknüpfen (falls RLS erlaubt)
     if (data.user) {

@@ -39,7 +39,6 @@
     <div style="flex:1"></div>
     <select id="weekCourt" style="width:auto;display:none"></select>
     <div class="seg" id="envSeg">
-      <button data-env="all" class="active">Alle</button>
       <button data-env="outdoor">Outdoor</button>
       <button data-env="indoor">Indoor</button>
     </div>
@@ -129,6 +128,12 @@ async function init(){
   courts=co||[]; hours=oh||[]; weekCourtId=courts[0]?.id||null;
   $('#weekCourt').innerHTML=courts.map(c=>`<option value="${c.id}">${c.name} · ${c.environment==='indoor'?'Indoor':'Outdoor'}</option>`).join('');
 
+  // Saison-Default: Sommer (Apr–Sep) = Outdoor, Winter (Okt–Mär) = Indoor
+  const mon=new Date().getMonth()+1;
+  envFilter=(mon>=4 && mon<=9)?'outdoor':'indoor';
+  if(!courts.some(c=>c.environment===envFilter)) envFilter=courts.some(c=>c.environment==='outdoor')?'outdoor':'indoor';
+  $('#envSeg').querySelectorAll('[data-env]').forEach(x=>x.classList.toggle('active',x.dataset.env===envFilter));
+
   // Events
   $('#viewSeg').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
     $('#viewSeg').querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
@@ -152,8 +157,12 @@ async function init(){
   await loadRange();
 
   // Rückkehr von Stripe
-  if(params.get('paid')) msg('Zahlung erfolgreich – deine Buchung ist bestätigt. Danke! 🎾','ok');
-  else if(params.get('cancelled')) msg('Zahlung abgebrochen – die Reservierung wird in Kürze wieder freigegeben.','info');
+  if(params.get('paid')){ sessionStorage.removeItem('cb_pending'); msg('Zahlung erfolgreich – deine Buchung ist bestätigt. Danke! 🎾','ok'); }
+  else if(params.get('cancelled')){
+    const pid=sessionStorage.getItem('cb_pending');
+    if(pid){ await sb.rpc('release_pending_booking',{p_id:pid}); sessionStorage.removeItem('cb_pending'); await loadRange(); }
+    msg('Zahlung abgebrochen – die Reservierung wurde wieder freigegeben.','info');
+  }
   if(params.get('paid')||params.get('cancelled')){
     const u=new URL(location.href); u.searchParams.delete('paid'); u.searchParams.delete('cancelled');
     history.replaceState({},'',u);
@@ -299,7 +308,7 @@ async function confirmBooking(){
     bm.className='msg show info'; bm.textContent='Weiterleitung zur Zahlung…';
     $('#bookConfirm').disabled=true;
     const { data:co, error:ce } = await sb.functions.invoke('create-checkout',{ body:{ booking_id:data.id }});
-    if(co?.url){ window.location.href=co.url; return; }
+    if(co?.url){ sessionStorage.setItem('cb_pending', data.id); window.location.href=co.url; return; }
     $('#bookConfirm').disabled=false;
     bm.className='msg show error'; bm.textContent=(co&&co.error)||ce?.message||'Zahlung konnte nicht gestartet werden.';
     return;

@@ -225,6 +225,7 @@ const sb = window.cbClient();
 const params = new URLSearchParams(location.search);
 const $ = s => document.querySelector(s);
 const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+const SURF = {clay:'Sand', hard:'Hart', carpet:'Teppich', grass:'Rasen'};
 let me = null, isHead = false, club = null, courts = [], members = [];
 
 init();
@@ -234,8 +235,11 @@ async function init() {
   if (!session) { location.href = 'login.html'; return; }
   const email = session.user.email;
 
+  // Abmelden IMMER früh verdrahten (auch für Nicht-Admins, damit man den falschen Account verlassen kann)
+  $('#logoutBtn').addEventListener('click', async e=>{ e.preventDefault(); await sb.auth.signOut(); location.href='login.html'; });
+
   const { data:admin } = await sb.from('app_admins').select('*').ilike('email', email).maybeSingle();
-  if (!admin) { $('#gate').className='msg show error'; $('#gate').textContent = 'Kein Admin-Zugang für ' + email + '. Bitte mit einem Admin-Konto anmelden.'; return; }
+  if (!admin) { $('#gate').className='msg show error'; $('#gate').innerHTML = 'Kein Admin-Zugang für <b>' + email + '</b>. Melde dich oben rechts ab und mit einem Admin-Konto an.'; return; }
   me = admin; isHead = admin.role === 'head_admin';
   $('#roleBadge').textContent = isHead ? 'Head-Admin' : 'Club-Admin';
   if(isHead) $('#clubsTab').style.display='';
@@ -256,7 +260,6 @@ async function init() {
   }
   if (!clubs.length) { $('#gate').className='msg show info'; $('#gate').textContent='Noch kein Club zugeordnet.'; return; }
 
-  $('#logoutBtn').addEventListener('click', async e=>{ e.preventDefault(); await sb.auth.signOut(); location.href='login.html'; });
   document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
     document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
     document.querySelectorAll('.tabpane').forEach(x=>x.classList.remove('active'));
@@ -319,7 +322,7 @@ async function loadCourts() {
     <div class="field-row" style="align-items:center;border-bottom:1px solid var(--line);padding:10px 0">
       <div style="flex:2"><b>${c.name}</b></div>
       <div><span class="badge" style="${c.environment==='indoor'?'color:var(--indoor);background:rgba(59,125,216,.1)':'color:var(--outdoor);background:rgba(224,138,43,.12)'}">${c.environment==='indoor'?'Indoor':'Outdoor'}</span></div>
-      <div class="sub">${c.surface}</div>
+      <div class="sub">${SURF[c.surface]||c.surface}</div>
       <div style="flex:0 0 130px"><input type="number" value="${c.price_per_hour}" step="0.5" min="0" data-price="${c.id}" style="padding:7px"></div>
       <div style="flex:0 0 auto"><button class="btn btn-ghost btn-sm" data-savecourt="${c.id}">✓</button>
         <button class="btn btn-danger btn-sm" data-delcourt="${c.id}">Löschen</button></div>
