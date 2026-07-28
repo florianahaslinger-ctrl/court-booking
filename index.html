@@ -66,6 +66,11 @@
       <label for="gMail">E-Mail</label>
       <input type="email" id="gMail" placeholder="du@example.com">
     </div>
+    <div id="playersBox" style="margin-top:12px">
+      <label>Mitspieler <span class="sub" style="font-weight:400">(optional, bis zu 3 · Preis pro Person)</span></label>
+      <div id="playerRows"></div>
+      <button type="button" class="btn btn-ghost btn-sm" id="addPlayer" style="margin-top:8px">+ Mitspieler</button>
+    </div>
     <div id="bookMsg" class="msg"></div>
     <div style="display:flex;gap:10px;margin-top:18px">
       <button class="btn btn-ghost" id="bookCancel" style="flex:1">Abbrechen</button>
@@ -85,12 +90,14 @@
 const $ = s => document.querySelector(s);
 $('#yr').textContent = new Date().getFullYear();
 const sb = window.cbClient();
+window.CB.wireClubNav();
 const params = new URLSearchParams(location.search);
 const slug = params.get('club') || window.CB_CONFIG.DEFAULT_CLUB;
 const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 const MON = ['Jan','Feb','März','Apr','Mai','Juni','Juli','Aug','Sep','Okt','Nov','Dez'];
 
 let club=null, courts=[], hours=[], priceWindows=[], bookingTypes=[], busy=[], mine=[], myMember=null, session=null;
+let memberOptions=[], players=[];
 let view='day', envFilter='all', anchor=new Date(), weekCourtId=null, pending=null;
 
 const msg=(t,cls='error')=>{const m=$('#msg');m.className='msg show '+cls;m.textContent=t;};
@@ -125,6 +132,9 @@ async function init(){
     const { data:m }=await sb.from('members').select('*').eq('club_id',club.id).ilike('email',session.user.email).eq('active',true).maybeSingle();
     if(m){myMember=m;$('#memberBadge').style.display='inline-flex';$('#guestFields').style.display='none';}
   }
+  // Mitglieder-Auswahl für Mitspieler (nur für eingeloggte Mitglieder/Admins befüllt; Gäste bekommen leere Liste)
+  const { data:mo }=await sb.rpc('club_member_options',{p_club_slug:slug});
+  memberOptions=mo||[];
 
   const [{data:co},{data:oh},{data:pw},{data:bt}]=await Promise.all([
     sb.from('courts').select('*').eq('club_id',club.id).eq('active',true).order('sort'),
@@ -161,6 +171,7 @@ async function init(){
   $('#jump').onchange=e=>{if(e.target.value){anchor=new Date(e.target.value+'T00:00:00');loadRange();}};
   $('#bookCancel').onclick=()=>$('#bookModal').classList.remove('open');
   $('#bookConfirm').onclick=confirmBooking;
+  $('#addPlayer').onclick=()=>{ if(players.length<3){players.push({sel:'guest',name:''}); renderPlayers(); recalc();} };
 
   await loadRange();
 
@@ -306,23 +317,65 @@ function wireCells(courtPool){
   });
 }
 
+function canPickMember(){ return !!myMember && memberOptions.length>0; }
+
+function renderPlayers(){
+  const box=$('#playerRows');
+  box.innerHTML=players.map((p,i)=>{
+    let ctrl;
+    if(canPickMember()){
+      const opts=`<option value="guest"${p.sel==='guest'?' selected':''}>Gast (Name eingeben)</option>`+
+        memberOptions.map(m=>`<option value="${m.id}"${p.sel===m.id?' selected':''}>${esc(m.full_name)}</option>`).join('');
+      ctrl=`<select data-psel="${i}" style="flex:1">${opts}</select>`+
+        (p.sel==='guest'?`<input type="text" data-pname="${i}" placeholder="Name Gast" value="${esc(p.name||'')}" style="flex:1">`:'');
+    } else {
+      ctrl=`<input type="text" data-pname="${i}" placeholder="Name Mitspieler" value="${esc(p.name||'')}" style="flex:1">`;
+    }
+    return `<div class="field-row" style="gap:8px;margin-top:8px;align-items:center">${ctrl}`+
+      `<button type="button" class="btn btn-ghost btn-sm" data-prem="${i}" title="Entfernen">✕</button></div>`;
+  }).join('');
+  box.querySelectorAll('[data-psel]').forEach(s=>s.onchange=e=>{players[+e.target.dataset.psel].sel=e.target.value; renderPlayers(); recalc();});
+  box.querySelectorAll('[data-pname]').forEach(inp=>inp.oninput=e=>{players[+e.target.dataset.pname].name=e.target.value; recalc();});
+  box.querySelectorAll('[data-prem]').forEach(b=>b.onclick=()=>{players.splice(+b.dataset.prem,1); renderPlayers(); recalc();});
+  $('#addPlayer').style.display = players.length>=3?'none':'inline-flex';
+}
+
+function participantsPayload(){
+  return players.map(p=>{
+    if(canPickMember() && p.sel && p.sel!=='guest') return {member_id:p.sel};
+    const nm=(p.name||'').trim(); return nm?{guest_name:nm}:null;
+  }).filter(Boolean);
+}
+
 function openBooking(court,s,e){
   pending={court,s,e};
-  const isMember=!!myMember, minutes=(e-s)/60000;
+  players=[];
+  renderPlayers();
+  recalc();
+  $('#bookMsg').className='msg';
+  $('#bookModal').classList.add('open');
+}
+
+function recalc(){
+  const {court,s,e}=pending, minutes=(e-s)/60000, hrs=minutes/60;
   const rate=window.CB.rateFor(court,priceWindows,s);
-  const price=window.CB.priceFor(court,club,minutes,isMember,rate);
-  const rmode=window.CB.rules(club,court.environment).mode;
+  const facM=window.CB.memberFactor(club,court.environment);
+  const unit=Math.round(rate*hrs*100)/100;                       // voller Preis pro Person
+  const parts=participantsPayload();
+  let total=Math.round(unit*(myMember?facM:1)*100)/100;          // Bucher
+  parts.forEach(pp=>{ total += pp.member_id ? Math.round(unit*facM*100)/100 : unit; });
+  total=Math.round(total*100)/100;
+  const persons=1+parts.length;
   const win=priceWindows.find(w=>w.environment===court.environment&&(w.weekdays||[]).includes(s.getDay())
               &&(s.getHours()*60+s.getMinutes())>=toMin(w.start_time.slice(0,5))
               &&(s.getHours()*60+s.getMinutes())<toMin(w.end_time.slice(0,5)));
+  const rmode=window.CB.rules(club,court.environment).mode;
   $('#bookSummary').innerHTML=
     `<b>${esc(court.name)}</b> · ${court.environment==='indoor'?'Indoor':'Outdoor'}<br>`+
     `${WD[s.getDay()]} ${s.getDate()}.${s.getMonth()+1}., ${fmtHM(s)}–${fmtHM(e)}<br>`+
-    `Preis: <b>${window.CB.money(price,club.currency)}</b>`+
+    `${persons} ${persons===1?'Person':'Personen'} · Gesamt: <b>${window.CB.money(total,club.currency)}</b>`+
     (win&&win.label?` · <span class="badge">${esc(win.label)}</span>`:'')+
-    (isMember&&rmode==='free'?' (Mitglied – gratis)':isMember?' (Mitglieder-Preis)':'');
-  $('#bookMsg').className='msg';
-  $('#bookModal').classList.add('open');
+    (myMember&&rmode==='free'?' · Mitglied gratis':myMember?' · Mitglieder-Preis':'');
 }
 
 async function confirmBooking(){
@@ -332,7 +385,8 @@ async function confirmBooking(){
     if(!name||!mail){bm.className='msg show error';bm.textContent='Bitte Name und E-Mail angeben.';return;}}
   $('#bookConfirm').disabled=true;
   const {data,error}=await sb.rpc('create_booking',{p_club_slug:slug,p_court:court.id,
-    p_start:s.toISOString(),p_end:e.toISOString(),p_guest_name:name,p_guest_email:mail});
+    p_start:s.toISOString(),p_end:e.toISOString(),p_guest_name:name,p_guest_email:mail,
+    p_participants:participantsPayload()});
   $('#bookConfirm').disabled=false;
   if(error){bm.className='msg show error';bm.textContent=error.message;return;}
 

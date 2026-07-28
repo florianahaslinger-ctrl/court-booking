@@ -58,6 +58,11 @@ window.CB = {
       default:         return round2(base); // 'full'
     }
   },
+  // Preisfaktor für ein Mitglied auf dieser Platzart (0=gratis, <1=Rabatt, 1=voll)
+  memberFactor(club, env) {
+    const r = this.rules(club, env);
+    return r.mode === 'free' ? 0 : r.mode === 'discount' ? (1 - (r.disc || 0) / 100) : 1;
+  },
   // maximal erlaubte Buchungsdauer (min) für diese Person auf diesem Platz
   maxMinutes(club, isMember, env) {
     const r = this.rules(club, env);
@@ -72,3 +77,18 @@ window.CB = {
 };
 function round2(n) { return Math.round(n * 100) / 100; }
 function hm(t) { if (!t) return 0; const p = String(t).split(':'); return (+p[0]) * 60 + (+p[1] || 0); }
+
+// Aktuellen ?club=-Parameter erhalten: an interne Nav-Links (index/konto/login) anhängen,
+// damit man beim Wechsel nicht auf den Default-Club zurückfällt.
+window.CB.clubQuery = function () {
+  const c = new URLSearchParams(location.search).get('club');
+  return c ? ('?club=' + encodeURIComponent(c)) : '';
+};
+window.CB.wireClubNav = function () {
+  const q = window.CB.clubQuery();
+  if (!q) return;
+  document.querySelectorAll('a[href]').forEach(a => {
+    const h = a.getAttribute('href');
+    if (/^(index|konto|login)\.html$/.test(h)) a.setAttribute('href', h + q);
+  });
+};

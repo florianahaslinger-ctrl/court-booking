@@ -49,6 +49,7 @@
 <script src="assets/config.js"></script>
 <script>
 const sb = window.cbClient();
+window.CB.wireClubNav();
 const params = new URLSearchParams(location.search);
 const slug = params.get('club') || window.CB_CONFIG.DEFAULT_CLUB;
 const $ = s => document.querySelector(s);
@@ -103,7 +104,7 @@ async function loadBookings() {
       <td>${s.toLocaleDateString('de-AT',{weekday:'short',day:'2-digit',month:'2-digit',year:'2-digit'})}</td>
       <td>${s.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}–${e.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}</td>
       <td>${b.court?.name||''} <span class="sub">(${b.court?.environment==='indoor'?'Indoor':'Outdoor'})</span></td>
-      <td>${({guest:'Gast',member:'Mitglied',free:'Gratis',block:'Sperre',subscription:'Abo'})[b.kind]||b.kind}</td>
+      <td>${({guest:'Gast',member:'Mitglied',free:'Gratis',block:'Sperre',subscription:'Abo'})[b.kind]||b.kind}${b.person_count>1?` <span class="sub">· ${b.person_count} Pers.</span>`:''}</td>
       <td>${window.CB.money(b.price, club.currency)}</td>
       <td>${st[b.status]||b.status}</td>
     </tr>`;

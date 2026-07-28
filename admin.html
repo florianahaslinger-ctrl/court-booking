@@ -243,6 +243,7 @@
           <button class="btn btn-ghost" id="stripeStatusBtn">Status prüfen</button>
         </div>
         <p class="hint">Stripe führt dich durch die Verifizierung (Firmen-/Kontodaten). Danach werden Gäste-Zahlungen automatisch deinem Club gutgeschrieben.</p>
+        <p class="hint">Pro Online-Zahlung wird eine Servicegebühr von <b>3,5 % + 0,25 €</b> einbehalten; die Stripe-Transaktionsgebühr (i. d. R. ~1,5 % + 0,25 €) trägt ebenfalls der Club. Der Auszahlungsbetrag ist der Buchungspreis abzüglich dieser Gebühren.</p>
       </div>
     </div>
 
@@ -476,7 +477,7 @@ async function loadBookings() {
     const art=b.type?.name?`<span class="badge" style="background:${b.type.color}22;color:${b.type.color};border:1px solid ${b.type.color}55">${(b.type.name+'').replace(/[<>&"]/g,'')}</span>`:(kd[b.kind]||b.kind);
     return `<tr><td>${t1.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}–${t2.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}</td>
       <td>${b.court?.name||''}</td><td>${art}</td>
-      <td>${b.guest_name||b.guest_email||(b.member_id?'Mitglied':'')||b.note||'—'}</td>
+      <td>${b.guest_name||b.guest_email||(b.member_id?'Mitglied':'')||b.note||'—'}${b.person_count>1?` <span class="sub">+${b.person_count-1}</span>`:''}</td>
       <td>${window.CB.money(b.price,club.currency)}</td><td>${st[b.status]||b.status}</td>
       <td><button class="btn btn-danger btn-sm" data-cancel="${b.id}">Stornieren</button></td></tr>`;}).join('')
     : '<tr><td colspan="7" class="sub">Keine Buchungen an diesem Tag.</td></tr>';

@@ -49,6 +49,7 @@
 <script src="assets/config.js"></script>
 <script>
 const sb = window.cbClient();
+window.CB.wireClubNav();
 const params = new URLSearchParams(location.search);
 const slug = params.get('club') || window.CB_CONFIG.DEFAULT_CLUB;
 let mode = 'signin'; // oder 'signup'
