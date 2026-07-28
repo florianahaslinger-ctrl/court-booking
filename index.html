@@ -203,7 +203,7 @@ async function loadRange(){
   mine=[];
   if(myMember){
     const { data:mb }=await sb.from('bookings').select('court_id,start_at,end_at')
-      .gte('start_at',start.toISOString()).lt('start_at',end.toISOString()).neq('status','cancelled');
+      .eq('club_id',club.id).gte('start_at',start.toISOString()).lt('start_at',end.toISOString()).neq('status','cancelled');
     mine=(mb||[]).map(x=>({court_id:x.court_id,s:new Date(x.start_at).getTime(),e:new Date(x.end_at).getTime()}));
   }
   render();

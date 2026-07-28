@@ -92,6 +92,7 @@ async function loadBookings() {
   const tb = $('#bookTable tbody');
   const { data, error } = await sb.from('bookings')
     .select('*, court:courts(name,environment)')
+    .eq('club_id', club.id)
     .gte('end_at', new Date().toISOString())
     .order('start_at');
   if (error) { tb.innerHTML = `<tr><td colspan="6" class="sub">${error.message}</td></tr>`; return; }

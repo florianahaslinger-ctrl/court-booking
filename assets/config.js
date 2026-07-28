@@ -8,7 +8,7 @@ window.CB_CONFIG = {
   SUPABASE_ANON: 'sb_publishable_JFelea80c4j9p3cVcFp0lg_T2eSPjFR',
 
   // Standard-Club, wenn keine ?club=slug in der URL steht
-  DEFAULT_CLUB:  'demo-tennis',
+  DEFAULT_CLUB:  'tc-jeitschko',
 };
 
 // Supabase-Client (aus CDN geladen in der jeweiligen Seite)
