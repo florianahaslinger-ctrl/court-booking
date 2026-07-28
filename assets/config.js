@@ -19,20 +19,30 @@ window.cbClient = function () {
 
 // ---- gemeinsame Helfer -------------------------------------
 window.CB = {
+  // Preisregeln je Platzart (Indoor/Outdoor) mit Fallback aufs club-weite Modell
+  rules(club, env) {
+    return {
+      mode: club['member_pricing_mode_' + env] ?? club.member_pricing_mode,
+      disc: club['member_discount_percent_' + env] ?? club.member_discount_percent,
+      freemax: club['member_free_max_minutes_' + env] ?? club.member_free_max_minutes,
+    };
+  },
   // Preis einer Buchung berechnen (Client-Vorschau; Server bleibt Quelle der Wahrheit)
   priceFor(court, club, minutes, isMember) {
     const hours = minutes / 60;
     const base  = Number(court.price_per_hour || 0) * hours;
     if (!isMember) return round2(base);
-    switch (club.member_pricing_mode) {
+    const r = this.rules(club, court.environment);
+    switch (r.mode) {
       case 'free':     return 0;
-      case 'discount': return round2(base * (1 - (club.member_discount_percent || 0) / 100));
+      case 'discount': return round2(base * (1 - (r.disc || 0) / 100));
       default:         return round2(base); // 'full'
     }
   },
-  // maximal erlaubte Buchungsdauer (min) für diese Person
-  maxMinutes(club, isMember) {
-    if (isMember && club.member_pricing_mode === 'free') return club.member_free_max_minutes || 300;
+  // maximal erlaubte Buchungsdauer (min) für diese Person auf diesem Platz
+  maxMinutes(club, isMember, env) {
+    const r = this.rules(club, env);
+    if (isMember && r.mode === 'free') return r.freemax || 300;
     return 24 * 60;
   },
   money(v, cur = 'EUR') {

@@ -283,11 +283,12 @@ function openBooking(court,s,e){
   pending={court,s,e};
   const isMember=!!myMember, minutes=(e-s)/60000;
   const price=window.CB.priceFor(court,club,minutes,isMember);
+  const rmode=window.CB.rules(club,court.environment).mode;
   $('#bookSummary').innerHTML=
     `<b>${court.name}</b> · ${court.environment==='indoor'?'Indoor':'Outdoor'}<br>`+
     `${WD[s.getDay()]} ${s.getDate()}.${s.getMonth()+1}., ${fmtHM(s)}–${fmtHM(e)}<br>`+
     `Preis: <b>${window.CB.money(price,club.currency)}</b>`+
-    (isMember&&club.member_pricing_mode==='free'?' (Mitglied – gratis)':isMember?' (Mitglieder-Preis)':'');
+    (isMember&&rmode==='free'?' (Mitglied – gratis)':isMember?' (Mitglieder-Preis)':'');
   $('#bookMsg').className='msg';
   $('#bookModal').classList.add('open');
 }

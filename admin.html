@@ -114,17 +114,33 @@
     <div class="tabpane" id="tab-preise">
       <div class="card">
         <h2>Mitglieder-Preismodell</h2>
-        <div class="field-row" style="margin-top:10px">
+        <span class="sub">Getrennt einstellbar für Outdoor- und Indoor-Plätze.</span>
+
+        <h3 style="margin:16px 0 0;font-size:15px;color:var(--outdoor)">🌤 Outdoor</h3>
+        <div class="field-row" style="margin-top:8px">
           <div><label>Modell</label>
-            <select id="mpMode">
+            <select id="mpModeO">
               <option value="free">Mitglieder gratis</option>
               <option value="discount">Mitglieder mit Rabatt</option>
               <option value="full">Mitglieder zahlen voll</option>
             </select></div>
-          <div id="discWrap"><label>Rabatt (%)</label><input type="number" id="mpDisc" value="50" min="0" max="100"></div>
-          <div id="freeWrap"><label>Max. Std bei Gratis</label><input type="number" id="mpFree" value="5" min="1" step="0.5"></div>
+          <div id="discWrapO"><label>Rabatt (%)</label><input type="number" id="mpDiscO" min="0" max="100"></div>
+          <div id="freeWrapO"><label>Max. Std bei Gratis</label><input type="number" id="mpFreeO" min="1" step="0.5"></div>
         </div>
-        <div class="field-row">
+
+        <h3 style="margin:18px 0 0;font-size:15px;color:var(--indoor)">🏠 Indoor</h3>
+        <div class="field-row" style="margin-top:8px">
+          <div><label>Modell</label>
+            <select id="mpModeI">
+              <option value="free">Mitglieder gratis</option>
+              <option value="discount">Mitglieder mit Rabatt</option>
+              <option value="full">Mitglieder zahlen voll</option>
+            </select></div>
+          <div id="discWrapI"><label>Rabatt (%)</label><input type="number" id="mpDiscI" min="0" max="100"></div>
+          <div id="freeWrapI"><label>Max. Std bei Gratis</label><input type="number" id="mpFreeI" min="1" step="0.5"></div>
+        </div>
+
+        <div class="field-row" style="margin-top:18px">
           <div><label>Währung</label><input type="text" id="mpCur" value="EUR"></div>
           <div><label>Markenfarbe</label><input type="color" id="mpColor" value="#2E8B57" style="height:44px;padding:4px"></div>
           <div><label>Vorausbuchbar (Tage)</label><input type="number" id="mpOpenDays" value="14" min="1"></div>
@@ -226,7 +242,7 @@ const params = new URLSearchParams(location.search);
 const $ = s => document.querySelector(s);
 const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 const SURF = {clay:'Sand', hard:'Hart', carpet:'Teppich', grass:'Rasen'};
-let me = null, isHead = false, club = null, courts = [], members = [];
+let me = null, isHead = false, club = null, clubs = [], courts = [], members = [];
 
 init();
 
@@ -245,7 +261,7 @@ async function init() {
   if(isHead) $('#clubsTab').style.display='';
 
   // Welche Clubs? Head sieht alle, Club-Admin nur seinen.
-  let clubs = [];
+  clubs = [];
   if (isHead) {
     const { data } = await sb.from('clubs').select('*').order('name');
     clubs = data || [];
@@ -253,7 +269,11 @@ async function init() {
     sel.innerHTML = clubs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
     const wanted = params.get('club');
     if (wanted) { const c = clubs.find(x=>x.slug===wanted); if (c) sel.value = c.id; }
-    sel.addEventListener('change', ()=> selectClub(clubs.find(c=>c.id===sel.value)));
+    sel.addEventListener('change', async ()=>{
+      let c = clubs.find(x=>x.id===sel.value);
+      if (!c) { const { data:d } = await sb.from('clubs').select('*').eq('id', sel.value).maybeSingle(); if (d){ c=d; clubs.push(d); } }
+      if (c) selectClub(c);
+    });
   } else {
     const { data } = await sb.from('clubs').select('*').eq('id', admin.club_id).maybeSingle();
     clubs = data ? [data] : [];
@@ -270,6 +290,7 @@ async function init() {
 }
 
 async function selectClub(c) {
+  if (!c) return;
   club = c;
   $('#app').style.display='block';
   $('#clubTitle').textContent = club.name;
@@ -281,9 +302,12 @@ async function selectClub(c) {
 
   // Settings in Formulare
   $('#slotMin').value = club.slot_minutes;
-  $('#mpMode').value = club.member_pricing_mode;
-  $('#mpDisc').value = club.member_discount_percent;
-  $('#mpFree').value = (club.member_free_max_minutes/60);
+  $('#mpModeO').value = club.member_pricing_mode_outdoor;
+  $('#mpDiscO').value = club.member_discount_percent_outdoor;
+  $('#mpFreeO').value = (club.member_free_max_minutes_outdoor/60);
+  $('#mpModeI').value = club.member_pricing_mode_indoor;
+  $('#mpDiscI').value = club.member_discount_percent_indoor;
+  $('#mpFreeI').value = (club.member_free_max_minutes_indoor/60);
   $('#mpCur').value = club.currency;
   $('#mpColor').value = club.primary_color || '#2E8B57';
   $('#mpOpenDays').value = club.booking_open_days;
@@ -309,7 +333,7 @@ async function loadStats() {
     <div class="stat"><div class="k">Plätze</div><div class="v">${courts.length}</div><div class="s">${courts.filter(c=>c.environment==='indoor').length} Indoor · ${courts.filter(c=>c.environment==='outdoor').length} Outdoor</div></div>
     <div class="stat"><div class="k">Mitglieder</div><div class="v">${active}</div><div class="s">von ${members.length} gesamt</div></div>
     <div class="stat"><div class="k">Offene Buchungen</div><div class="v">${bCount||0}</div><div class="s">ab heute</div></div>
-    <div class="stat"><div class="k">Slot-Länge</div><div class="v">${club.slot_minutes}′</div><div class="s">${({free:'Mitglieder gratis',discount:club.member_discount_percent+'% Rabatt',full:'voller Preis'})[club.member_pricing_mode]}</div></div>`;
+    <div class="stat"><div class="k">Slot-Länge</div><div class="v">${club.slot_minutes}′</div><div class="s">Mitglied · O: ${({free:'gratis',discount:club.member_discount_percent_outdoor+'%',full:'voll'})[club.member_pricing_mode_outdoor]} · I: ${({free:'gratis',discount:club.member_discount_percent_indoor+'%',full:'voll'})[club.member_pricing_mode_indoor]}</div></div>`;
 }
 
 // ---------- Plätze ----------
@@ -407,14 +431,17 @@ async function loadAbos() {
 }
 
 function togglePricingFields(){
-  const m=$('#mpMode').value;
-  $('#discWrap').style.display = m==='discount'?'block':'none';
-  $('#freeWrap').style.display = m==='free'?'block':'none';
+  for(const x of ['O','I']){
+    const m=$('#mpMode'+x).value;
+    $('#discWrap'+x).style.display = m==='discount'?'block':'none';
+    $('#freeWrap'+x).style.display = m==='free'?'block':'none';
+  }
 }
 
 // ---------- Aktionen verdrahten ----------
 function wireActions() {
-  $('#mpMode').addEventListener('change', togglePricingFields);
+  $('#mpModeO').addEventListener('change', togglePricingFields);
+  $('#mpModeI').addEventListener('change', togglePricingFields);
   $('#listDate').addEventListener('change', loadBookings);
 
   $('#ncAdd').onclick = async () => {
@@ -437,8 +464,10 @@ function wireActions() {
   };
 
   $('#savePricing').onclick = async () => {
-    const upd={ member_pricing_mode:$('#mpMode').value, member_discount_percent:+$('#mpDisc').value,
-      member_free_max_minutes:Math.round(+$('#mpFree').value*60), currency:$('#mpCur').value.trim().toUpperCase(),
+    const upd={
+      member_pricing_mode_outdoor:$('#mpModeO').value, member_discount_percent_outdoor:+$('#mpDiscO').value, member_free_max_minutes_outdoor:Math.round(+$('#mpFreeO').value*60),
+      member_pricing_mode_indoor:$('#mpModeI').value,  member_discount_percent_indoor:+$('#mpDiscI').value,  member_free_max_minutes_indoor:Math.round(+$('#mpFreeI').value*60),
+      currency:$('#mpCur').value.trim().toUpperCase(),
       primary_color:$('#mpColor').value, booking_open_days:+$('#mpOpenDays').value, cancel_lead_minutes:Math.round(+$('#mpCancel').value*60) };
     const { error } = await sb.from('clubs').update(upd).eq('id',club.id);
     if(error){flash('#prMsg',error.message,'error');return;}
@@ -503,7 +532,8 @@ function wireActions() {
     await sb.from('opening_hours').insert(rows);
     $('#ncClubName').value='';$('#ncClubSlug').value='';$('#ncClubOwner').value='';
     flash('#clubMsg','Club „'+name+'" angelegt. Buchungsseite: index.html?club='+slug,'ok');
-    // Club-Auswahl oben aktualisieren
+    // Club-Auswahl oben aktualisieren (auch die interne Liste!)
+    clubs.push(nc);
     const opt=document.createElement('option'); opt.value=nc.id; opt.textContent=name; $('#clubPick').appendChild(opt);
     loadClubsTable();
   };

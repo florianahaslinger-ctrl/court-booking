@@ -73,8 +73,8 @@ async function init() {
     .eq('club_id', club.id).ilike('email', email).maybeSingle();
   member = m;
   if (member && member.active) {
-    let mode = ({free:'gratis', discount:club.member_discount_percent+'% Rabatt', full:'zum vollen Preis'})[club.member_pricing_mode];
-    $('#memberLine').innerHTML = `<span class="badge member">✓ Aktives Mitglied</span> — du buchst ${mode}.`;
+    const lbl = (m,d) => ({free:'gratis', discount:(d||0)+'% Rabatt', full:'voller Preis'})[m];
+    $('#memberLine').innerHTML = `<span class="badge member">✓ Aktives Mitglied</span> — Outdoor: ${lbl(club.member_pricing_mode_outdoor,club.member_discount_percent_outdoor)}, Indoor: ${lbl(club.member_pricing_mode_indoor,club.member_discount_percent_indoor)}.`;
   } else if (member) {
     $('#memberLine').innerHTML = `<span class="badge warn">Mitgliedschaft inaktiv</span> — bitte an den Club wenden.`;
   } else {
