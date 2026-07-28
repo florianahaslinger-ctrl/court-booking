@@ -62,7 +62,7 @@ async function init() {
   if (!session) { location.href = 'login.html' + location.search; return; }
   const email = session.user.email;
 
-  const { data:c } = await sb.from('clubs').select('*').eq('slug', slug).maybeSingle();
+  const { data:c } = await sb.from('club_public').select('*').eq('slug', slug).maybeSingle();
   club = c;
   if (club) { $('#brandName').textContent = club.name; if (club.primary_color) document.documentElement.style.setProperty('--brand', club.primary_color); }
 

@@ -153,6 +153,14 @@ thead .col-time{z-index:4}
 .bk-cell.closed{background:var(--surface-2);cursor:default}
 .bk-cell.sel{background:var(--brand-600);color:#fff;font-weight:700}
 
+/* Wochenansicht: zweistufiger Kopf (Tag -> alle Plätze) */
+.bk-grid.week thead tr:first-child th{height:30px;padding:6px 6px}
+.bk-grid.week thead tr:last-child th{top:31px}
+.bk-grid.week th.day-head{background:var(--surface-2);font-size:12.5px}
+.bk-grid.week th.court-sub{font-size:11px;font-weight:500;padding:5px 3px;min-width:44px;color:var(--ink-soft);background:var(--surface)}
+.bk-grid.week td.bk-cell{min-width:44px;height:32px;font-size:12px}
+.day-sep{border-left:2px solid var(--line-strong)!important}
+
 /* ---------- Formulare ---------- */
 label{display:block;font-size:12.5px;font-weight:600;letter-spacing:.02em;color:var(--ink-soft);margin:14px 0 6px}
 input[type=text],input[type=email],input[type=number],input[type=password],

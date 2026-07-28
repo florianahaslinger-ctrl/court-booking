@@ -110,7 +110,7 @@ async function init(){
   const { data:{ session:s } } = await sb.auth.getSession();
   session=s;
 
-  const { data:c, error } = await sb.from('clubs').select('*').eq('slug',slug).eq('active',true).maybeSingle();
+  const { data:c, error } = await sb.from('club_public').select('*').eq('slug',slug).maybeSingle();
   if(error||!c){msg('Club „'+slug+'" nicht gefunden.');return;}
   club=c;
   document.title='Platz buchen – '+club.name;
@@ -133,8 +133,8 @@ async function init(){
   $('#viewSeg').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
     $('#viewSeg').querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
     view=b.dataset.view;
-    $('#weekCourt').style.display=view==='week'?'inline-block':'none';
-    $('#envSeg').style.display=view==='week'?'none':'inline-flex';
+    $('#weekCourt').style.display='none';
+    $('#envSeg').style.display='inline-flex';
     loadRange();
   });
   $('#envSeg').querySelectorAll('[data-env]').forEach(b=>b.onclick=()=>{
@@ -224,8 +224,8 @@ function renderWeek(host){
   const start=startOfWeek(anchor), days=[...Array(7)].map((_,i)=>{const d=new Date(start);d.setDate(d.getDate()+i);return d;});
   const last=days[6];
   $('#dateLabel').textContent=`${start.getDate()}. ${MON[start.getMonth()]} – ${last.getDate()}. ${MON[last.getMonth()]}`;
-  const court=courts.find(c=>c.id===weekCourtId)||courts[0];
-  if(!court){host.innerHTML='<div class="card"><p class="sub">Keine Plätze.</p></div>';return;}
+  const cols=courts.filter(c=>envFilter==='all'||c.environment===envFilter);
+  if(!cols.length){host.innerHTML='<div class="card"><p class="sub">Keine Plätze in dieser Kategorie.</p></div>';return;}
 
   // Zeitbereich = weiteste Öffnung über die Woche
   let open=24*60, close=0, any=false;
@@ -233,23 +233,32 @@ function renderWeek(host){
   if(!any){host.innerHTML='<div class="card"><p class="sub">Diese Woche geschlossen.</p></div>';return;}
   const step=club.slot_minutes;
 
-  let head=`<tr><th class="col-time">Zeit</th>`+days.map(d=>
-    `<th>${WD[d.getDay()]}<span class="env" style="color:var(--muted)">${d.getDate()}.${d.getMonth()+1}</span></th>`).join('')+`</tr>`;
+  // Kopf: 2 Ebenen (Tag -> alle Plätze)
+  let h1=`<tr><th class="col-time" rowspan="2">Zeit</th>`, h2=`<tr>`;
+  days.forEach((d,di)=>{
+    h1+=`<th class="day-head${di>0?' day-sep':''}" colspan="${cols.length}">${WD[d.getDay()]} ${d.getDate()}.${d.getMonth()+1}</th>`;
+    cols.forEach((c,ci)=>{ h2+=`<th class="court-sub${ci===0&&di>0?' day-sep':''}" title="${c.name} (${c.environment==='indoor'?'Indoor':'Outdoor'})">${c.name.replace(/^Platz\s*/i,'P').replace(/^Halle\s*/i,'H')}</th>`; });
+  });
+  h1+=`</tr>`; h2+=`</tr>`;
+
   let body='';
   for(let m=open;m+step<=close;m+=step){
     body+=`<tr><td class="col-time">${fromMin(m)}</td>`;
-    for(const d of days){
+    days.forEach((d,di)=>{
       const oh=openingFor(d.getDay());
       const inside=oh&&!oh.closed&&m>=toMin(oh.open_time.slice(0,5))&&m+step<=toMin(oh.close_time.slice(0,5));
-      if(!inside){body+=`<td class="bk-cell closed"></td>`;continue;}
-      const s=new Date(`${ymd(d)}T${fromMin(m)}:00`).getTime(), e=s+step*60000;
-      const st=cellStatus(court.id,s,e);
-      const label=st==='mine'?'meine':st==='busy'?'belegt':'';
-      body+=`<td class="bk-cell ${st}" ${st==='free'?`data-book="${court.id}|${s}|${e}"`:''}>${label}</td>`;
-    }
+      cols.forEach((c,ci)=>{
+        const sep=(ci===0&&di>0)?' day-sep':'';
+        if(!inside){body+=`<td class="bk-cell closed${sep}"></td>`;return;}
+        const s=new Date(`${ymd(d)}T${fromMin(m)}:00`).getTime(), e=s+step*60000;
+        const st=cellStatus(c.id,s,e);
+        const label=st==='mine'?'✓':'';
+        body+=`<td class="bk-cell ${st}${sep}" ${st==='free'?`data-book="${c.id}|${s}|${e}"`:''}>${label}</td>`;
+      });
+    });
     body+=`</tr>`;
   }
-  host.innerHTML=`<div class="grid-scroll"><table class="bk-grid"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+  host.innerHTML=`<div class="grid-scroll"><table class="bk-grid week"><thead>${h1}${h2}</thead><tbody>${body}</tbody></table></div>`;
   wireCells(courts);
 }
 

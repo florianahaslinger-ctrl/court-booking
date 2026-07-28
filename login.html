@@ -60,7 +60,7 @@ const msg = (t, cls='error') => { const m=$('#msg'); m.className='msg show '+cls
   const { data:{ session } } = await sb.auth.getSession();
   if (session) location.href = 'konto.html' + location.search;
 
-  const { data:c } = await sb.from('clubs').select('name,primary_color').eq('slug', slug).maybeSingle();
+  const { data:c } = await sb.from('club_public').select('name,primary_color').eq('slug', slug).maybeSingle();
   if (c) { $('#brandName').textContent = c.name; if (c.primary_color) document.documentElement.style.setProperty('--brand', c.primary_color); }
 })();
 
