@@ -45,7 +45,7 @@
     <span id="memberBadge" class="badge member" style="display:none">✓ Mitglied</span>
   </div>
 
-  <div class="bk-legend">
+  <div class="bk-legend" id="legend">
     <span><i class="free"></i> frei</span>
     <span><i class="busy"></i> belegt</span>
     <span><i class="mine"></i> meine Buchung</span>
@@ -90,11 +90,16 @@ const slug = params.get('club') || window.CB_CONFIG.DEFAULT_CLUB;
 const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 const MON = ['Jan','Feb','März','Apr','Mai','Juni','Juli','Aug','Sep','Okt','Nov','Dez'];
 
-let club=null, courts=[], hours=[], busy=[], mine=[], myMember=null, session=null;
+let club=null, courts=[], hours=[], priceWindows=[], bookingTypes=[], busy=[], mine=[], myMember=null, session=null;
 let view='day', envFilter='all', anchor=new Date(), weekCourtId=null, pending=null;
 
 const msg=(t,cls='error')=>{const m=$('#msg');m.className='msg show '+cls;m.textContent=t;};
 const pad=n=>String(n).padStart(2,'0');
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const short=(s,n=14)=>{s=String(s||'');return s.length>n?s.slice(0,n-1)+'…':s;};
+const textOn=hex=>{const c=/^#?[0-9a-f]{6}$/i.test(hex||'')?String(hex).replace('#',''):'888888';
+  const r=parseInt(c.slice(0,2),16),g=parseInt(c.slice(2,4),16),b=parseInt(c.slice(4,6),16);
+  return (0.299*r+0.587*g+0.114*b)>150?'#1a1a1a':'#fff';};
 const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const toMin=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};
 const fromMin=m=>`${pad(Math.floor(m/60))}:${pad(m%60)}`;
@@ -121,11 +126,14 @@ async function init(){
     if(m){myMember=m;$('#memberBadge').style.display='inline-flex';$('#guestFields').style.display='none';}
   }
 
-  const [{data:co},{data:oh}]=await Promise.all([
+  const [{data:co},{data:oh},{data:pw},{data:bt}]=await Promise.all([
     sb.from('courts').select('*').eq('club_id',club.id).eq('active',true).order('sort'),
     sb.from('opening_hours').select('*').eq('club_id',club.id),
+    sb.from('price_windows').select('*').eq('club_id',club.id),
+    sb.from('booking_types').select('*').eq('club_id',club.id).eq('active',true).order('sort'),
   ]);
-  courts=co||[]; hours=oh||[]; weekCourtId=courts[0]?.id||null;
+  courts=co||[]; hours=oh||[]; priceWindows=pw||[]; bookingTypes=bt||[]; weekCourtId=courts[0]?.id||null;
+  renderLegend();
   $('#weekCourt').innerHTML=courts.map(c=>`<option value="${c.id}">${c.name} · ${c.environment==='indoor'?'Indoor':'Outdoor'}</option>`).join('');
 
   // Saison-Default: Sommer (Apr–Sep) = Outdoor, Winter (Okt–Mär) = Indoor
@@ -178,7 +186,7 @@ async function loadRange(){
 
   const { data:b }=await sb.from('court_busy').select('*')
     .eq('club_id',club.id).gte('start_at',start.toISOString()).lt('start_at',end.toISOString());
-  busy=(b||[]).map(x=>({court_id:x.court_id,s:new Date(x.start_at).getTime(),e:new Date(x.end_at).getTime()}));
+  busy=(b||[]).map(x=>({court_id:x.court_id,s:new Date(x.start_at).getTime(),e:new Date(x.end_at).getTime(),label:x.label||null,typeName:x.type_name||null,typeColor:x.type_color||null}));
 
   mine=[];
   if(myMember){
@@ -190,6 +198,13 @@ async function loadRange(){
 }
 
 function overlaps(list,courtId,s,e){return list.some(iv=>iv.court_id===courtId&&iv.s<e&&iv.e>s);}
+function busyAt(courtId,s,e){return busy.find(iv=>iv.court_id===courtId&&iv.s<e&&iv.e>s)||null;}
+function busyLabel(courtId,s,e){const iv=busyAt(courtId,s,e);return iv&&iv.label?iv.label:null;}
+function renderLegend(){
+  const base='<span><i class="free"></i> frei</span><span><i class="busy"></i> belegt</span><span><i class="mine"></i> meine Buchung</span>';
+  const types=bookingTypes.map(t=>`<span><i style="background:${esc(t.color)};border-color:${esc(t.color)}"></i> ${esc(t.name)}</span>`).join('');
+  $('#legend').innerHTML=base+types;
+}
 function cellStatus(courtId,s,e){
   const now=Date.now();
   if(overlaps(mine,courtId,s,e)) return 'mine';
@@ -220,8 +235,14 @@ function renderDay(host){
     for(const c of cols){
       const s=new Date(`${dstr}T${fromMin(m)}:00`).getTime(), e=s+step*60000;
       const st=cellStatus(c.id,s,e);
-      const label=st==='mine'?'meine':st==='busy'?'belegt':st==='free'?'':'–';
-      body+=`<td class="bk-cell ${st}" ${st==='free'?`data-book="${c.id}|${s}|${e}"`:''}>${label}</td>`;
+      let label=st==='mine'?'meine':st==='busy'?'belegt':st==='free'?'':'–', attrs='';
+      if(st==='busy'){
+        const iv=busyAt(c.id,s,e);
+        if(iv&&iv.typeColor){const disp=iv.typeName||iv.label||'belegt'; label=short(disp);
+          attrs=` title="${esc(disp)}" style="background:${esc(iv.typeColor)};background-image:none;color:${textOn(iv.typeColor)}"`;}
+        else if(iv&&iv.label){label=short(iv.label); attrs=` title="${esc(iv.label)}"`;}
+      }
+      body+=`<td class="bk-cell ${st}"${attrs} ${st==='free'?`data-book="${c.id}|${s}|${e}"`:''}>${esc(label)}</td>`;
     }
     body+=`</tr>`;
   }
@@ -262,7 +283,13 @@ function renderWeek(host){
         const s=new Date(`${ymd(d)}T${fromMin(m)}:00`).getTime(), e=s+step*60000;
         const st=cellStatus(c.id,s,e);
         const label=st==='mine'?'✓':'';
-        body+=`<td class="bk-cell ${st}${sep}" ${st==='free'?`data-book="${c.id}|${s}|${e}"`:''}>${label}</td>`;
+        let attrs='';
+        if(st==='busy'){
+          const iv=busyAt(c.id,s,e);
+          if(iv&&iv.typeColor) attrs=` title="${esc(iv.typeName||iv.label||'')}" style="background:${esc(iv.typeColor)};background-image:none"`;
+          else if(iv&&iv.label) attrs=` title="${esc(iv.label)}"`;
+        }
+        body+=`<td class="bk-cell ${st}${sep}"${attrs} ${st==='free'?`data-book="${c.id}|${s}|${e}"`:''}>${label}</td>`;
       });
     });
     body+=`</tr>`;
@@ -282,12 +309,17 @@ function wireCells(courtPool){
 function openBooking(court,s,e){
   pending={court,s,e};
   const isMember=!!myMember, minutes=(e-s)/60000;
-  const price=window.CB.priceFor(court,club,minutes,isMember);
+  const rate=window.CB.rateFor(court,priceWindows,s);
+  const price=window.CB.priceFor(court,club,minutes,isMember,rate);
   const rmode=window.CB.rules(club,court.environment).mode;
+  const win=priceWindows.find(w=>w.environment===court.environment&&(w.weekdays||[]).includes(s.getDay())
+              &&(s.getHours()*60+s.getMinutes())>=toMin(w.start_time.slice(0,5))
+              &&(s.getHours()*60+s.getMinutes())<toMin(w.end_time.slice(0,5)));
   $('#bookSummary').innerHTML=
-    `<b>${court.name}</b> · ${court.environment==='indoor'?'Indoor':'Outdoor'}<br>`+
+    `<b>${esc(court.name)}</b> · ${court.environment==='indoor'?'Indoor':'Outdoor'}<br>`+
     `${WD[s.getDay()]} ${s.getDate()}.${s.getMonth()+1}., ${fmtHM(s)}–${fmtHM(e)}<br>`+
     `Preis: <b>${window.CB.money(price,club.currency)}</b>`+
+    (win&&win.label?` · <span class="badge">${esc(win.label)}</span>`:'')+
     (isMember&&rmode==='free'?' (Mitglied – gratis)':isMember?' (Mitglieder-Preis)':'');
   $('#bookMsg').className='msg';
   $('#bookModal').classList.add('open');

@@ -27,10 +27,29 @@ window.CB = {
       freemax: club['member_free_max_minutes_' + env] ?? club.member_free_max_minutes,
     };
   },
-  // Preis einer Buchung berechnen (Client-Vorschau; Server bleibt Quelle der Wahrheit)
-  priceFor(court, club, minutes, isMember) {
+  // Stundenpreis für einen Slot: passendes Zeitfenster (nach Slot-START), sonst Platzpreis.
+  // Bei Überlappung gewinnt das engste Fenster (kürzeste Dauer) – wie serverseitig.
+  rateFor(court, windows, start) {
+    const base = Number(court.price_per_hour || 0);
+    if (!windows || !windows.length || !start) return base;
+    const wd = start.getDay();                        // 0=So .. 6=Sa
+    const tod = start.getHours() * 60 + start.getMinutes();
+    let best = null, bestSpan = Infinity;
+    for (const w of windows) {
+      if (w.environment !== court.environment) continue;
+      if (!(w.weekdays || []).includes(wd)) continue;
+      const a = hm(w.start_time), b = hm(w.end_time);
+      if (tod < a || tod >= b) continue;
+      if (b - a < bestSpan) { bestSpan = b - a; best = w; }
+    }
+    return best ? Number(best.price_per_hour) : base;
+  },
+  // Preis einer Buchung berechnen (Client-Vorschau; Server bleibt Quelle der Wahrheit).
+  // rate = Stundenpreis für diesen Slot (aus rateFor); ohne Angabe = Platzpreis.
+  priceFor(court, club, minutes, isMember, rate) {
     const hours = minutes / 60;
-    const base  = Number(court.price_per_hour || 0) * hours;
+    const perHour = (rate == null ? Number(court.price_per_hour || 0) : Number(rate));
+    const base  = perHour * hours;
     if (!isMember) return round2(base);
     const r = this.rules(club, court.environment);
     switch (r.mode) {
@@ -52,3 +71,4 @@ window.CB = {
   fmtDate(d) { return d.toLocaleDateString('de-AT', { weekday: 'short', day: '2-digit', month: 'short' }); },
 };
 function round2(n) { return Math.round(n * 100) / 100; }
+function hm(t) { if (!t) return 0; const p = String(t).split(':'); return (+p[0]) * 60 + (+p[1] || 0); }

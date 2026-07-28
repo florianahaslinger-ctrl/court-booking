@@ -161,6 +161,17 @@ thead .col-time{z-index:4}
 .bk-grid.week td.bk-cell{min-width:44px;height:32px;font-size:12px}
 .day-sep{border-left:2px solid var(--line-strong)!important}
 
+/* Wochentag-Auswahl (Chips) für Zeitfenster-Preise */
+.daypick{display:flex;gap:6px;flex-wrap:wrap}
+.daypick .chip{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;padding:6px 9px;border:1px solid var(--line-strong);border-radius:8px;cursor:pointer;user-select:none;background:var(--surface)}
+.daypick .chip input{width:auto;margin:0}
+
+/* Buchungs-Modi-Chips (Admin) */
+.modchip{display:inline-flex;align-items:center;gap:7px;font-size:13px;padding:5px 6px 5px 10px;border:1px solid var(--line-strong);border-radius:999px;margin:0 6px 6px 0;background:var(--surface)}
+.modchip i{width:13px;height:13px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.modchip .x{border:none;background:none;cursor:pointer;color:var(--muted);font-size:17px;line-height:1;padding:0 4px}
+.modchip .x:hover{color:#c0392b}
+
 /* ---------- Formulare ---------- */
 label{display:block;font-size:12.5px;font-weight:600;letter-spacing:.02em;color:var(--ink-soft);margin:14px 0 6px}
 input[type=text],input[type=email],input[type=number],input[type=password],

@@ -44,7 +44,18 @@
     <!-- BELEGUNG: Buchungen ansehen, sperren, gratis eintragen -->
     <div class="tabpane active" id="tab-belegung">
       <div class="card">
-        <h2>Platz sperren / Gratis-Buchung eintragen</h2>
+        <h2>Buchungs-Modi (Farben &amp; Legende)</h2>
+        <span class="sub">Eigene Modi wie „Training" oder „Turnier" mit Farbe – erscheinen unten als Auswahl beim Eintragen und als farbige Legende auf der Buchungsseite. „Sperre" und „Gratis-Buchung" gibt es immer.</span>
+        <div class="field-row" style="margin-top:12px;align-items:flex-end">
+          <div style="flex:2 1 220px"><label>Name</label><input type="text" id="btName" placeholder="z.B. Training"></div>
+          <div><label>Farbe</label><input type="color" id="btColor" value="#3B7DD8" style="height:44px;padding:4px"></div>
+          <button class="btn btn-primary" id="btAdd">Modus hinzufügen</button>
+        </div>
+        <div id="btMsg" class="msg"></div>
+        <div id="btList" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <h2>Platz sperren / Buchung eintragen</h2>
         <span class="sub">Sperre einen Platz (Wartung/Turnier) oder trage eine kostenlose Buchung ein.</span>
         <div class="field-row" style="margin-top:12px">
           <div><label>Platz</label><select id="bkCourt"></select></div>
@@ -150,6 +161,28 @@
         <button class="btn btn-primary" id="savePricing" style="margin-top:12px">Speichern</button>
         <p class="hint">Platzpreise (Indoor/Outdoor) legst du pro Platz im Reiter „Plätze" fest.</p>
       </div>
+
+      <div class="card">
+        <h2>Zeitabhängige Preise (Zeitfenster)</h2>
+        <span class="sub">Optionale €/Stunde je Platzart &amp; Uhrzeit. Trifft der Slot-Beginn kein Fenster, gilt der normale Platzpreis. Bei Überschneidung gewinnt das engste Fenster.</span>
+        <div class="field-row" style="margin-top:12px;align-items:flex-end">
+          <div><label>Platzart</label><select id="pwEnv"><option value="outdoor">Outdoor</option><option value="indoor">Indoor</option></select></div>
+          <div style="flex:2 1 240px"><label>Wochentage</label><div id="pwDays" class="daypick"></div></div>
+          <div><label>Von</label><input type="time" id="pwFrom" value="18:00"></div>
+          <div><label>Bis</label><input type="time" id="pwTo" value="22:00"></div>
+          <div><label>€/Stunde</label><input type="number" id="pwPrice" min="0" step="0.5" value="20"></div>
+          <div><label>Bezeichnung</label><input type="text" id="pwLabel" placeholder="z.B. Abendtarif"></div>
+        </div>
+        <div id="pwMsg" class="msg"></div>
+        <button class="btn btn-primary" id="pwAdd" style="margin-top:6px">Zeitfenster hinzufügen</button>
+        <div class="table-scroll" style="margin-top:14px">
+          <table class="data" id="pwTable">
+            <thead><tr><th>Platzart</th><th>Tage</th><th>Zeit</th><th>€/Std</th><th>Bezeichnung</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="hint">„Bis" ist exklusiv: für einen Abendtarif ab 18:00 wähle Von 18:00, Bis 22:00 (deckt Slot-Beginn 18:00–21:xx ab).</p>
+      </div>
     </div>
 
     <!-- MITGLIEDER -->
@@ -242,7 +275,7 @@ const params = new URLSearchParams(location.search);
 const $ = s => document.querySelector(s);
 const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 const SURF = {clay:'Sand', hard:'Hart', carpet:'Teppich', grass:'Rasen'};
-let me = null, isHead = false, club = null, clubs = [], courts = [], members = [];
+let me = null, isHead = false, club = null, clubs = [], courts = [], members = [], bookingTypes = [];
 
 init();
 
@@ -314,7 +347,8 @@ async function selectClub(c) {
   $('#mpCancel').value = Math.round(club.cancel_lead_minutes/60);
   togglePricingFields();
 
-  await Promise.all([loadCourts(), loadHours(), loadMembers()]);
+  initPwDays();
+  await Promise.all([loadCourts(), loadHours(), loadMembers(), loadPriceWindows(), loadBookingTypes()]);
   loadBookings(); loadAbos(); loadStats();
   refreshStripeStatus(false);
   if(isHead) loadClubsTable();
@@ -374,6 +408,43 @@ async function loadHours() {
   $('#hoursRows').innerHTML = rows;
 }
 
+// ---------- Buchungs-Modi ----------
+const clean=s=>String(s==null?'':s).replace(/[<>&"]/g,'');
+async function loadBookingTypes(){
+  const { data } = await sb.from('booking_types').select('*').eq('club_id',club.id).order('sort');
+  bookingTypes = data || [];
+  $('#bkKind').innerHTML = '<option value="block">Sperre</option><option value="free">Gratis-Buchung</option>'
+    + bookingTypes.map(t=>`<option value="type:${t.id}">${clean(t.name)}</option>`).join('');
+  $('#btList').innerHTML = bookingTypes.length ? bookingTypes.map(t=>`
+    <span class="modchip" style="border-color:${t.color}"><i style="background:${t.color}"></i>${clean(t.name)}
+      <button class="x" data-delbt="${t.id}" title="Modus löschen">×</button></span>`).join('')
+    : '<p class="sub">Noch keine eigenen Modi angelegt.</p>';
+  $('#btList').querySelectorAll('[data-delbt]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Modus löschen? Bestehende Buchungen bleiben bestehen, verlieren aber Farbe & Bezeichnung.')) return;
+    await sb.from('booking_types').delete().eq('id',b.dataset.delbt); loadBookingTypes(); loadBookings(); });
+}
+
+// ---------- Zeitfenster-Preise ----------
+const PW_DAYS=[[1,'Mo'],[2,'Di'],[3,'Mi'],[4,'Do'],[5,'Fr'],[6,'Sa'],[0,'So']];
+function initPwDays(){
+  $('#pwDays').innerHTML=PW_DAYS.map(([v,l])=>`<label class="chip"><input type="checkbox" value="${v}" checked>${l}</label>`).join('');
+}
+function pwDaysLabel(arr){const set=new Set(arr||[]);return PW_DAYS.filter(([v])=>set.has(v)).map(([,l])=>l).join(' ')||'—';}
+async function loadPriceWindows(){
+  const { data } = await sb.from('price_windows').select('*').eq('club_id',club.id).order('environment').order('start_time');
+  const rows=data||[];
+  $('#pwTable tbody').innerHTML = rows.length ? rows.map(w=>`
+    <tr><td>${w.environment==='indoor'?'Indoor':'Outdoor'}</td>
+      <td class="sub">${pwDaysLabel(w.weekdays)}</td>
+      <td>${w.start_time.slice(0,5)}–${w.end_time.slice(0,5)}</td>
+      <td>${window.CB.money(w.price_per_hour,club.currency)}</td>
+      <td>${w.label?String(w.label).replace(/[<>&"]/g,''):'—'}</td>
+      <td><button class="btn btn-danger btn-sm" data-delpw="${w.id}">Löschen</button></td></tr>`).join('')
+    : '<tr><td colspan="6" class="sub">Keine Zeitfenster – es gilt überall der Platzpreis.</td></tr>';
+  $('#pwTable').querySelectorAll('[data-delpw]').forEach(b=>b.onclick=async()=>{
+    await sb.from('price_windows').delete().eq('id',b.dataset.delpw); loadPriceWindows(); });
+}
+
 // ---------- Mitglieder ----------
 async function loadMembers() {
   const { data } = await sb.from('members').select('*').eq('club_id',club.id).order('created_at',{ascending:false});
@@ -396,14 +467,15 @@ async function loadMembers() {
 async function loadBookings() {
   const day = $('#listDate').value;
   const s=new Date(day+'T00:00:00'), e=new Date(day+'T23:59:59');
-  const { data } = await sb.from('bookings').select('*, court:courts(name)')
+  const { data } = await sb.from('bookings').select('*, court:courts(name), type:booking_types(name,color)')
     .eq('club_id',club.id).gte('start_at',s.toISOString()).lte('start_at',e.toISOString()).order('start_at');
   const st={pending:'<span class="badge warn">offen</span>',confirmed:'<span class="badge ok">ok</span>',cancelled:'<span class="badge bad">storniert</span>'};
   const kd={guest:'Gast',member:'Mitglied',free:'Gratis',block:'Sperre',subscription:'Abo'};
   $('#bookTable tbody').innerHTML = (data&&data.length)? data.map(b=>{
     const t1=new Date(b.start_at),t2=new Date(b.end_at);
+    const art=b.type?.name?`<span class="badge" style="background:${b.type.color}22;color:${b.type.color};border:1px solid ${b.type.color}55">${(b.type.name+'').replace(/[<>&"]/g,'')}</span>`:(kd[b.kind]||b.kind);
     return `<tr><td>${t1.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}–${t2.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}</td>
-      <td>${b.court?.name||''}</td><td>${kd[b.kind]||b.kind}</td>
+      <td>${b.court?.name||''}</td><td>${art}</td>
       <td>${b.guest_name||b.guest_email||(b.member_id?'Mitglied':'')||b.note||'—'}</td>
       <td>${window.CB.money(b.price,club.currency)}</td><td>${st[b.status]||b.status}</td>
       <td><button class="btn btn-danger btn-sm" data-cancel="${b.id}">Stornieren</button></td></tr>`;}).join('')
@@ -456,6 +528,25 @@ function wireActions() {
     club.slot_minutes=parseInt($('#slotMin').value); loadStats(); flash('#prMsg','Slot-Länge gespeichert.','ok');
   };
 
+  $('#btAdd').onclick = async () => {
+    const name=$('#btName').value.trim(); if(!name){flash('#btMsg','Name nötig.','error');return;}
+    const { error } = await sb.from('booking_types').insert({club_id:club.id, name, color:$('#btColor').value, sort:bookingTypes.length+1});
+    if(error){flash('#btMsg',error.message,'error');return;}
+    $('#btName').value=''; flash('#btMsg','Modus „'+name+'" hinzugefügt.','ok'); loadBookingTypes();
+  };
+
+  $('#pwAdd').onclick = async () => {
+    const days=[...document.querySelectorAll('#pwDays input:checked')].map(i=>+i.value);
+    if(!days.length){flash('#pwMsg','Mindestens einen Wochentag wählen.','error');return;}
+    const from=$('#pwFrom').value, to=$('#pwTo').value;
+    if(!from||!to||to<=from){flash('#pwMsg','„Bis" muss nach „Von" liegen.','error');return;}
+    if($('#pwPrice').value===''||+$('#pwPrice').value<0){flash('#pwMsg','Preis ungültig.','error');return;}
+    const { error } = await sb.from('price_windows').insert({club_id:club.id, environment:$('#pwEnv').value,
+      weekdays:days, start_time:from, end_time:to, price_per_hour:$('#pwPrice').value, label:$('#pwLabel').value.trim()||null});
+    if(error){flash('#pwMsg',error.message,'error');return;}
+    $('#pwLabel').value=''; flash('#pwMsg','Zeitfenster hinzugefügt.','ok'); loadPriceWindows();
+  };
+
   $('#saveHours').onclick = async () => {
     const rows=[...document.querySelectorAll('#hoursRows tr')].map(tr=>{const wd=+tr.dataset.wd;
       return {club_id:club.id, weekday:wd, open_time:$(`[data-open="${wd}"]`).value, close_time:$(`[data-close="${wd}"]`).value, closed:$(`[data-closed="${wd}"]`).checked};});
@@ -485,12 +576,15 @@ function wireActions() {
   $('#bkAdd').onclick = async () => {
     const d=$('#bkDate').value; const start=new Date(`${d}T${$('#bkFrom').value}`), end=new Date(`${d}T${$('#bkTo').value}`);
     if(end<=start){flash('#bkMsg','Endzeit muss nach Startzeit liegen.','error');return;}
-    const kind=$('#bkKind').value;
-    const { error } = await sb.from('bookings').insert({club_id:club.id, court_id:$('#bkCourt').value, kind,
+    const sel=$('#bkKind').value; let kind=sel, booking_type_id=null;
+    if(sel.startsWith('type:')){ booking_type_id=sel.slice(5); kind='block'; }
+    const note=$('#bkNote').value.trim()||null;
+    const { error } = await sb.from('bookings').insert({club_id:club.id, court_id:$('#bkCourt').value, kind, booking_type_id,
       status:'confirmed', start_at:start.toISOString(), end_at:end.toISOString(), price:0, payment_status:'none',
-      note:$('#bkNote').value.trim()||null, guest_name:kind==='free'?($('#bkNote').value.trim()||null):null});
+      note, guest_name:kind==='free'?note:null});
     if(error){flash('#bkMsg', error.message.includes('overlap')||error.code==='23P01'?'Zeitraum überschneidet sich mit einer bestehenden Buchung.':error.message,'error');return;}
-    flash('#bkMsg', kind==='block'?'Platz gesperrt.':'Gratis-Buchung eingetragen.','ok'); loadBookings(); loadStats();
+    const what=booking_type_id?(bookingTypes.find(t=>t.id===booking_type_id)?.name||'Modus'):(kind==='block'?'Sperre':'Gratis-Buchung');
+    flash('#bkMsg', what+' eingetragen.','ok'); loadBookings(); loadStats();
   };
 
   $('#abAdd').onclick = async () => {
