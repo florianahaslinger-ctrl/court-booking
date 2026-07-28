@@ -50,6 +50,7 @@
     <span><i class="busy"></i> belegt</span>
     <span><i class="mine"></i> meine Buchung</span>
   </div>
+  <div class="bk-legend price-legend" id="priceLegend" style="display:none"></div>
 
   <div id="msg" class="msg"></div>
   <div id="gridHost"></div>
@@ -143,7 +144,7 @@ async function init(){
     sb.from('booking_types').select('*').eq('club_id',club.id).eq('active',true).order('sort'),
   ]);
   courts=co||[]; hours=oh||[]; priceWindows=pw||[]; bookingTypes=bt||[]; weekCourtId=courts[0]?.id||null;
-  renderLegend();
+  renderLegend(); renderPriceLegend();
   $('#weekCourt').innerHTML=courts.map(c=>`<option value="${c.id}">${c.name} · ${c.environment==='indoor'?'Indoor':'Outdoor'}</option>`).join('');
 
   // Saison-Default: Sommer (Apr–Sep) = Outdoor, Winter (Okt–Mär) = Indoor
@@ -216,6 +217,30 @@ function renderLegend(){
   const types=bookingTypes.map(t=>`<span><i style="background:${esc(t.color)};border-color:${esc(t.color)}"></i> ${esc(t.name)}</span>`).join('');
   $('#legend').innerHTML=base+types;
 }
+// Farbe des passenden Tarif-Fensters für einen freien Slot (engstes Fenster gewinnt)
+function windowColorFor(court,startMs){
+  const d=new Date(startMs), wd=d.getDay(), tod=d.getHours()*60+d.getMinutes();
+  let best=null,bestSpan=Infinity;
+  for(const w of priceWindows){
+    if(!w.color||w.environment!==court.environment) continue;
+    if(!(w.weekdays||[]).includes(wd)) continue;
+    const a=toMin(w.start_time.slice(0,5)), b=toMin(w.end_time.slice(0,5));
+    if(tod<a||tod>=b) continue;
+    if(b-a<bestSpan){bestSpan=b-a;best=w;}
+  }
+  return best?best.color:null;
+}
+function renderPriceLegend(){
+  const box=$('#priceLegend');
+  const wins=priceWindows.filter(w=>w.color);
+  if(!wins.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='flex';
+  box.innerHTML='<span class="pl-title">Tarife:</span>'+wins.map(w=>{
+    const env=w.environment==='indoor'?'Indoor':'Outdoor';
+    const lbl=w.label?esc(w.label):`${w.start_time.slice(0,5)}–${w.end_time.slice(0,5)}`;
+    return `<span><i style="background:${esc(w.color)};border-color:${esc(w.color)}"></i> ${lbl} · ${window.CB.money(w.price_per_hour,club.currency)}/Std <span class="sub">(${env})</span></span>`;
+  }).join('');
+}
 function cellStatus(courtId,s,e){
   const now=Date.now();
   if(overlaps(mine,courtId,s,e)) return 'mine';
@@ -252,6 +277,8 @@ function renderDay(host){
         if(iv&&iv.typeColor){const disp=iv.typeName||iv.label||'belegt'; label=short(disp);
           attrs=` title="${esc(disp)}" style="background:${esc(iv.typeColor)};background-image:none;color:${textOn(iv.typeColor)}"`;}
         else if(iv&&iv.label){label=short(iv.label); attrs=` title="${esc(iv.label)}"`;}
+      } else if(st==='free'){
+        const col=windowColorFor(c,s); if(col) attrs=` data-tint style="--tint:${esc(col)}2e"`;
       }
       body+=`<td class="bk-cell ${st}"${attrs} ${st==='free'?`data-book="${c.id}|${s}|${e}"`:''}>${esc(label)}</td>`;
     }
@@ -299,6 +326,8 @@ function renderWeek(host){
           const iv=busyAt(c.id,s,e);
           if(iv&&iv.typeColor) attrs=` title="${esc(iv.typeName||iv.label||'')}" style="background:${esc(iv.typeColor)};background-image:none"`;
           else if(iv&&iv.label) attrs=` title="${esc(iv.label)}"`;
+        } else if(st==='free'){
+          const col=windowColorFor(c,s); if(col) attrs=` data-tint style="--tint:${esc(col)}2e"`;
         }
         body+=`<td class="bk-cell ${st}${sep}"${attrs} ${st==='free'?`data-book="${c.id}|${s}|${e}"`:''}>${label}</td>`;
       });
@@ -360,12 +389,13 @@ function recalc(){
   const {court,s,e}=pending, minutes=(e-s)/60000, hrs=minutes/60;
   const rate=window.CB.rateFor(court,priceWindows,s);
   const facM=window.CB.memberFactor(club,court.environment);
-  const unit=Math.round(rate*hrs*100)/100;                       // voller Preis pro Person
+  const unit=Math.round(rate*hrs*100)/100;                       // voller Platzpreis (fix)
   const parts=participantsPayload();
-  let total=Math.round(unit*(myMember?facM:1)*100)/100;          // Bucher
-  parts.forEach(pp=>{ total += pp.member_id ? Math.round(unit*facM*100)/100 : unit; });
-  total=Math.round(total*100)/100;
   const persons=1+parts.length;
+  // Platzpreis geteilt durch Personenzahl, jede Person zahlt ihren Anteil nach Status
+  let sumFac=(myMember?facM:1);
+  parts.forEach(pp=>{ sumFac += pp.member_id ? facM : 1; });
+  const total=Math.round(unit*sumFac/persons*100)/100;
   const win=priceWindows.find(w=>w.environment===court.environment&&(w.weekdays||[]).includes(s.getDay())
               &&(s.getHours()*60+s.getMinutes())>=toMin(w.start_time.slice(0,5))
               &&(s.getHours()*60+s.getMinutes())<toMin(w.end_time.slice(0,5)));
@@ -373,9 +403,9 @@ function recalc(){
   $('#bookSummary').innerHTML=
     `<b>${esc(court.name)}</b> · ${court.environment==='indoor'?'Indoor':'Outdoor'}<br>`+
     `${WD[s.getDay()]} ${s.getDate()}.${s.getMonth()+1}., ${fmtHM(s)}–${fmtHM(e)}<br>`+
-    `${persons} ${persons===1?'Person':'Personen'} · Gesamt: <b>${window.CB.money(total,club.currency)}</b>`+
+    `${persons} ${persons===1?'Person':'Personen'} · Platzpreis ${window.CB.money(unit,club.currency)} · Gesamt: <b>${window.CB.money(total,club.currency)}</b>`+
     (win&&win.label?` · <span class="badge">${esc(win.label)}</span>`:'')+
-    (myMember&&rmode==='free'?' · Mitglied gratis':myMember?' · Mitglieder-Preis':'');
+    (myMember&&rmode==='free'?' · du (Mitglied) gratis':myMember?' · Mitglieder-Preis':'');
 }
 
 async function confirmBooking(){

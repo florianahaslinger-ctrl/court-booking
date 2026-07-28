@@ -172,12 +172,13 @@
           <div><label>Bis</label><input type="time" id="pwTo" value="22:00"></div>
           <div><label>€/Stunde</label><input type="number" id="pwPrice" min="0" step="0.5" value="20"></div>
           <div><label>Bezeichnung</label><input type="text" id="pwLabel" placeholder="z.B. Abendtarif"></div>
+          <div><label>Farbe (Tarif)</label><input type="color" id="pwColor" value="#E08A2B" style="height:44px;padding:4px"></div>
         </div>
         <div id="pwMsg" class="msg"></div>
         <button class="btn btn-primary" id="pwAdd" style="margin-top:6px">Zeitfenster hinzufügen</button>
         <div class="table-scroll" style="margin-top:14px">
           <table class="data" id="pwTable">
-            <thead><tr><th>Platzart</th><th>Tage</th><th>Zeit</th><th>€/Std</th><th>Bezeichnung</th><th></th></tr></thead>
+            <thead><tr><th>Platzart</th><th>Tage</th><th>Zeit</th><th>€/Std</th><th>Farbe</th><th>Bezeichnung</th><th></th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -224,7 +225,7 @@
           <button class="btn btn-primary" id="abAdd">Abo anlegen</button>
           <button class="btn btn-ghost" id="abGen">Abo-Buchungen jetzt erzeugen</button>
         </div>
-        <p class="hint">Wiederkehrende Buchungen werden automatisch täglich für die nächsten 3 Wochen erzeugt. „Jetzt erzeugen" macht es sofort.</p>
+        <p class="hint">Wiederkehrende Buchungen werden automatisch täglich im Voraus erzeugt (bis zu 1 Jahr, begrenzt durch das Abo-Enddatum). „Jetzt erzeugen" macht es sofort für den gesamten Zeitraum.</p>
       </div>
       <div class="card"><div class="table-scroll"><table class="data" id="aboTable">
         <thead><tr><th>Mitglied</th><th>Slot</th><th>Platz</th><th>Zeitraum</th><th></th></tr></thead><tbody></tbody>
@@ -439,11 +440,14 @@ async function loadPriceWindows(){
       <td class="sub">${pwDaysLabel(w.weekdays)}</td>
       <td>${w.start_time.slice(0,5)}–${w.end_time.slice(0,5)}</td>
       <td>${window.CB.money(w.price_per_hour,club.currency)}</td>
+      <td><input type="color" value="${w.color||'#dddddd'}" data-pwcolor="${w.id}" title="Tarif-Farbe (auto-speichern)" style="width:42px;height:30px;padding:2px;cursor:pointer"></td>
       <td>${w.label?String(w.label).replace(/[<>&"]/g,''):'—'}</td>
       <td><button class="btn btn-danger btn-sm" data-delpw="${w.id}">Löschen</button></td></tr>`).join('')
     : '<tr><td colspan="6" class="sub">Keine Zeitfenster – es gilt überall der Platzpreis.</td></tr>';
   $('#pwTable').querySelectorAll('[data-delpw]').forEach(b=>b.onclick=async()=>{
     await sb.from('price_windows').delete().eq('id',b.dataset.delpw); loadPriceWindows(); });
+  $('#pwTable').querySelectorAll('[data-pwcolor]').forEach(inp=>inp.onchange=async()=>{
+    await sb.from('price_windows').update({color:inp.value}).eq('id',inp.dataset.pwcolor); loadPriceWindows(); });
 }
 
 // ---------- Mitglieder ----------
@@ -543,7 +547,7 @@ function wireActions() {
     if(!from||!to||to<=from){flash('#pwMsg','„Bis" muss nach „Von" liegen.','error');return;}
     if($('#pwPrice').value===''||+$('#pwPrice').value<0){flash('#pwMsg','Preis ungültig.','error');return;}
     const { error } = await sb.from('price_windows').insert({club_id:club.id, environment:$('#pwEnv').value,
-      weekdays:days, start_time:from, end_time:to, price_per_hour:$('#pwPrice').value, label:$('#pwLabel').value.trim()||null});
+      weekdays:days, start_time:from, end_time:to, price_per_hour:$('#pwPrice').value, label:$('#pwLabel').value.trim()||null, color:$('#pwColor').value});
     if(error){flash('#pwMsg',error.message,'error');return;}
     $('#pwLabel').value=''; flash('#pwMsg','Zeitfenster hinzugefügt.','ok'); loadPriceWindows();
   };
@@ -601,7 +605,7 @@ function wireActions() {
   $('#abGen').onclick = async () => {
     const { data:n, error } = await sb.rpc('generate_my_subscriptions',{p_club:club.id});
     if(error){flash('#abMsg',error.message,'error');return;}
-    flash('#abMsg',(n||0)+' Abo-Buchung(en) für die nächsten 3 Wochen erzeugt.','ok'); loadBookings();
+    flash('#abMsg',(n||0)+' Abo-Buchung(en) im Voraus erzeugt.','ok'); loadBookings();
   };
 
   // Stripe Connect
