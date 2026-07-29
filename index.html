@@ -370,10 +370,15 @@ function renderPlayers(){
 }
 
 function participantsPayload(){
+  // Jede hinzugefügte Zeile zählt (Gast zahlt seinen Anteil). Leere Zeilen NICHT
+  // verwerfen, sonst würde ein namenloser Gast fälschlich gratis "verschwinden".
   return players.map(p=>{
     if(canPickMember() && p.sel && p.sel!=='guest') return {member_id:p.sel};
-    const nm=(p.name||'').trim(); return nm?{guest_name:nm}:null;
-  }).filter(Boolean);
+    return {guest_name:(p.name||'').trim()};
+  });
+}
+function guestRowsMissingName(){
+  return players.some(p=> !(canPickMember() && p.sel && p.sel!=='guest') && !(p.name||'').trim());
 }
 
 function openBooking(court,s,e){
@@ -413,6 +418,7 @@ async function confirmBooking(){
   let name=null,mail=null;
   if(!myMember){name=$('#gName').value.trim();mail=$('#gMail').value.trim();
     if(!name||!mail){bm.className='msg show error';bm.textContent='Bitte Name und E-Mail angeben.';return;}}
+  if(guestRowsMissingName()){bm.className='msg show error';bm.textContent='Bitte für jeden Gast-Mitspieler einen Namen angeben oder die Zeile mit ✕ entfernen.';return;}
   $('#bookConfirm').disabled=true;
   const {data,error}=await sb.rpc('create_booking',{p_club_slug:slug,p_court:court.id,
     p_start:s.toISOString(),p_end:e.toISOString(),p_guest_name:name,p_guest_email:mail,
