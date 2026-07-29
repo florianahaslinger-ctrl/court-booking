@@ -36,6 +36,7 @@
       <button data-tab="zeiten">Öffnungszeiten &amp; Slot</button>
       <button data-tab="preise">Preise &amp; Mitglieder-Regeln</button>
       <button data-tab="mitglieder">Mitglieder</button>
+      <button data-tab="guthaben">Guthaben</button>
       <button data-tab="abos">Abos</button>
       <button data-tab="zahlungen">Zahlungen</button>
       <button data-tab="clubs" id="clubsTab" style="display:none">Clubs</button>
@@ -204,6 +205,27 @@
       </table></div></div>
     </div>
 
+    <!-- GUTHABEN -->
+    <div class="tabpane" id="tab-guthaben">
+      <div class="card">
+        <h2>Guthaben gutschreiben / abbuchen</h2>
+        <span class="sub">Betrag auf ein Konto buchen (Mitglied auswählen oder E-Mail direkt). Negativer Betrag = Abbuchung. Wird nicht unter 0 gebucht.</span>
+        <div class="field-row" style="margin-top:12px;align-items:flex-end">
+          <div style="flex:2 1 220px"><label>Mitglied</label><select id="wSelMember"><option value="">– E-Mail direkt eingeben –</option></select></div>
+          <div style="flex:2 1 200px"><label>oder E-Mail</label><input type="email" id="wEmail" placeholder="gast@example.com"></div>
+          <div><label>Betrag (€)</label><input type="number" id="wAmount" step="0.5" value="10"></div>
+          <div style="flex:2 1 200px"><label>Notiz</label><input type="text" id="wNote" placeholder="z.B. Barzahlung"></div>
+        </div>
+        <div id="wMsg" class="msg"></div>
+        <button class="btn btn-primary" id="wAdd" style="margin-top:6px">Buchen</button>
+      </div>
+      <div class="card"><h2>Konten</h2>
+        <div class="table-scroll"><table class="data" id="walletTable">
+          <thead><tr><th>E-Mail</th><th>Guthaben</th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
+    </div>
+
     <!-- ABOS -->
     <div class="tabpane" id="tab-abos">
       <div class="card">
@@ -351,7 +373,7 @@ async function selectClub(c) {
 
   initPwDays();
   await Promise.all([loadCourts(), loadHours(), loadMembers(), loadPriceWindows(), loadBookingTypes()]);
-  loadBookings(); loadAbos(); loadStats();
+  loadBookings(); loadAbos(); loadStats(); loadWalletAdmin();
   refreshStripeStatus(false);
   if(isHead) loadClubsTable();
   if(params.get('stripe')==='return'){
@@ -426,6 +448,16 @@ async function loadBookingTypes(){
     await sb.from('booking_types').delete().eq('id',b.dataset.delbt); loadBookingTypes(); loadBookings(); });
 }
 
+// ---------- Guthaben (Wallet) ----------
+async function loadWalletAdmin(){
+  $('#wSelMember').innerHTML = '<option value="">– E-Mail direkt eingeben –</option>' +
+    members.map(m=>`<option value="${(m.email||'').toLowerCase()}">${clean(m.full_name||m.email)} (${clean(m.email)})</option>`).join('');
+  const { data } = await sb.from('wallet_accounts').select('email,balance').eq('club_id',club.id).order('balance',{ascending:false});
+  $('#walletTable tbody').innerHTML = (data&&data.length)? data.map(a=>`
+    <tr><td>${clean(a.email)}</td><td>${window.CB.money(a.balance,club.currency)}</td></tr>`).join('')
+    : '<tr><td colspan="2" class="sub">Noch keine Guthaben-Konten.</td></tr>';
+}
+
 // ---------- Zeitfenster-Preise ----------
 const PW_DAYS=[[1,'Mo'],[2,'Di'],[3,'Mi'],[4,'Do'],[5,'Fr'],[6,'Sa'],[0,'So']];
 function initPwDays(){
@@ -486,8 +518,10 @@ async function loadBookings() {
       <td><button class="btn btn-danger btn-sm" data-cancel="${b.id}">Stornieren</button></td></tr>`;}).join('')
     : '<tr><td colspan="7" class="sub">Keine Buchungen an diesem Tag.</td></tr>';
   $('#bookTable').querySelectorAll('[data-cancel]').forEach(b=>b.onclick=async()=>{
-    if(!confirm('Buchung stornieren?')) return;
-    await sb.from('bookings').update({status:'cancelled'}).eq('id',b.dataset.cancel); loadBookings(); loadStats(); });
+    if(!confirm('Buchung stornieren? Ein bezahlter Betrag wird dem Konto als Guthaben gutgeschrieben.')) return;
+    const { error } = await sb.rpc('cancel_booking',{p_id:b.dataset.cancel});
+    if(error){alert(error.message);return;}
+    loadBookings(); loadStats(); loadWalletAdmin(); });
 }
 
 // ---------- Abos ----------
@@ -538,6 +572,18 @@ function wireActions() {
     const { error } = await sb.from('booking_types').insert({club_id:club.id, name, color:$('#btColor').value, sort:bookingTypes.length+1});
     if(error){flash('#btMsg',error.message,'error');return;}
     $('#btName').value=''; flash('#btMsg','Modus „'+name+'" hinzugefügt.','ok'); loadBookingTypes();
+  };
+
+  $('#wAdd').onclick = async () => {
+    const email = ($('#wSelMember').value || $('#wEmail').value.trim()).toLowerCase();
+    const amount = Number($('#wAmount').value);
+    if(!email || !email.includes('@')){flash('#wMsg','Mitglied wählen oder gültige E-Mail eingeben.','error');return;}
+    if(!amount){flash('#wMsg','Betrag darf nicht 0 sein.','error');return;}
+    const { data, error } = await sb.rpc('admin_adjust_wallet',{p_club:club.id, p_email:email, p_amount:amount, p_note:$('#wNote').value.trim()||null});
+    if(error){flash('#wMsg',error.message,'error');return;}
+    $('#wAmount').value='10'; $('#wNote').value=''; $('#wEmail').value=''; $('#wSelMember').value='';
+    flash('#wMsg','Gebucht. Neuer Saldo: '+window.CB.money(data,club.currency),'ok');
+    loadWalletAdmin();
   };
 
   $('#pwAdd').onclick = async () => {

@@ -27,13 +27,32 @@
 
   <div id="msg" class="msg"></div>
 
+  <div class="card" id="walletCard" style="display:none">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <h2 style="flex:1;margin:0">Mein Guthaben</h2>
+      <div style="font-size:24px;font-weight:700;color:var(--brand-600)" id="walletBalance">—</div>
+    </div>
+    <span class="sub">Lade Guthaben auf und bezahle Buchungen bequem damit. Stornos werden als Guthaben gutgeschrieben.</span>
+    <div class="field-row" style="margin-top:12px;align-items:flex-end">
+      <div style="flex:0 0 170px"><label>Betrag (€)</label><input type="number" id="topupAmount" min="5" max="1000" step="5" value="20"></div>
+      <button class="btn btn-primary" id="topupBtn">Guthaben aufladen</button>
+    </div>
+    <div id="walletMsg" class="msg"></div>
+    <div class="table-scroll" style="margin-top:14px">
+      <table class="data" id="ledgerTable">
+        <thead><tr><th>Datum</th><th>Vorgang</th><th>Betrag</th></tr></thead>
+        <tbody><tr><td colspan="3" class="sub">Lädt…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="card">
     <h2>Kommende Buchungen</h2>
     <span class="sub">Deine reservierten Plätze.</span>
     <div class="table-scroll" style="margin-top:14px">
       <table class="data" id="bookTable">
-        <thead><tr><th>Datum</th><th>Zeit</th><th>Platz</th><th>Art</th><th>Preis</th><th>Status</th></tr></thead>
-        <tbody><tr><td colspan="6" class="sub">Lädt…</td></tr></tbody>
+        <thead><tr><th>Datum</th><th>Zeit</th><th>Platz</th><th>Art</th><th>Preis</th><th>Status</th><th></th></tr></thead>
+        <tbody><tr><td colspan="7" class="sub">Lädt…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -53,6 +72,7 @@ window.CB.wireClubNav();
 const params = new URLSearchParams(location.search);
 const slug = params.get('club') || window.CB_CONFIG.DEFAULT_CLUB;
 const $ = s => document.querySelector(s);
+const msg = (t, cls='error') => { const m=$('#msg'); m.className='msg show '+cls; m.textContent=t; };
 const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 let club = null, member = null;
 
@@ -84,6 +104,22 @@ async function init() {
 
   loadBookings();
   loadAbo();
+  loadWallet();
+
+  $('#topupBtn').onclick = async () => {
+    if(!member) return;
+    const amount=Number($('#topupAmount').value), wm=$('#walletMsg');
+    if(!(amount>=5)){wm.className='msg show error';wm.textContent='Mindestens 5 € aufladen.';return;}
+    $('#topupBtn').disabled=true; wm.className='msg show info'; wm.textContent='Weiterleitung zur Zahlung…';
+    const { data, error } = await sb.functions.invoke('create-topup',{ body:{ club_slug:slug, email:member.email, amount }});
+    if(data?.url){ location.href=data.url; return; }
+    $('#topupBtn').disabled=false; wm.className='msg show error'; wm.textContent=(data&&data.error)||error?.message||'Aufladung fehlgeschlagen.';
+  };
+
+  const rp=new URLSearchParams(location.search);
+  if(rp.get('topup')){ msg('Aufladung erfolgreich – dein Guthaben wird aktualisiert. 🎾','ok'); setTimeout(loadWallet,1500); }
+  else if(rp.get('topup_cancelled')){ msg('Aufladung abgebrochen.','info'); }
+  if(rp.get('topup')||rp.get('topup_cancelled')){ const u=new URL(location.href); u.searchParams.delete('topup'); u.searchParams.delete('topup_cancelled'); history.replaceState({},'',u); }
 
   $('#logoutBtn').addEventListener('click', async (e)=>{ e.preventDefault(); await sb.auth.signOut(); location.href='login.html'+location.search; });
 }
@@ -95,12 +131,14 @@ async function loadBookings() {
     .eq('club_id', club.id)
     .gte('end_at', new Date().toISOString())
     .order('start_at');
-  if (error) { tb.innerHTML = `<tr><td colspan="6" class="sub">${error.message}</td></tr>`; return; }
-  if (!data.length) { tb.innerHTML = `<tr><td colspan="6" class="sub">Keine kommenden Buchungen. <a href="index.html${location.search}" style="color:var(--brand-600);font-weight:600">Jetzt buchen →</a></td></tr>`; return; }
+  if (error) { tb.innerHTML = `<tr><td colspan="7" class="sub">${error.message}</td></tr>`; return; }
+  if (!data.length) { tb.innerHTML = `<tr><td colspan="7" class="sub">Keine kommenden Buchungen. <a href="index.html${location.search}" style="color:var(--brand-600);font-weight:600">Jetzt buchen →</a></td></tr>`; return; }
 
   const st = { pending:'<span class="badge warn">offen</span>', confirmed:'<span class="badge ok">bestätigt</span>', cancelled:'<span class="badge bad">storniert</span>' };
+  const now = Date.now();
   tb.innerHTML = data.map(b => {
     const s = new Date(b.start_at), e = new Date(b.end_at);
+    const canCancel = b.status!=='cancelled' && !['subscription','block'].includes(b.kind) && s.getTime()>now;
     return `<tr>
       <td>${s.toLocaleDateString('de-AT',{weekday:'short',day:'2-digit',month:'2-digit',year:'2-digit'})}</td>
       <td>${s.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}–${e.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}</td>
@@ -108,8 +146,33 @@ async function loadBookings() {
       <td>${({guest:'Gast',member:'Mitglied',free:'Gratis',block:'Sperre',subscription:'Abo'})[b.kind]||b.kind}${b.person_count>1?` <span class="sub">· ${b.person_count} Pers.</span>`:''}</td>
       <td>${window.CB.money(b.price, club.currency)}</td>
       <td>${st[b.status]||b.status}</td>
+      <td>${canCancel?`<button class="btn btn-ghost btn-sm" data-cancel="${b.id}">Stornieren</button>`:''}</td>
     </tr>`;
   }).join('');
+  tb.querySelectorAll('[data-cancel]').forEach(btn=>btn.onclick=async()=>{
+    if(!confirm('Buchung stornieren? Der bezahlte Betrag wird deinem Guthaben gutgeschrieben.')) return;
+    btn.disabled=true;
+    const { data:r, error:err } = await sb.rpc('cancel_booking',{p_id:btn.dataset.cancel});
+    if(err){ msg(err.message,'error'); btn.disabled=false; return; }
+    const ref=Number(r?.refunded||0);
+    msg(ref>0?`Storniert – ${window.CB.money(ref,club.currency)} als Guthaben gutgeschrieben.`:'Buchung storniert.','ok');
+    loadBookings(); loadWallet();
+  });
+}
+
+async function loadWallet() {
+  if (!member) { $('#walletCard').style.display='none'; return; }
+  $('#walletCard').style.display='block';
+  const { data:bal } = await sb.rpc('wallet_get', { p_club_slug: slug });
+  $('#walletBalance').textContent = window.CB.money(bal||0, club.currency);
+  const { data:led } = await sb.from('wallet_ledger').select('*').eq('club_id', club.id).order('created_at',{ascending:false}).limit(50);
+  const kd = { deposit:'Aufladung', booking:'Buchung', cancel_refund:'Storno-Gutschrift', admin_credit:'Gutschrift', admin_debit:'Abbuchung' };
+  $('#ledgerTable tbody').innerHTML = (led&&led.length) ? led.map(l=>{
+    const amt=Number(l.amount), pos=amt>=0;
+    return `<tr><td>${new Date(l.created_at).toLocaleString('de-AT',{dateStyle:'short',timeStyle:'short'})}</td>
+      <td>${kd[l.kind]||l.kind}${l.note?` <span class="sub">· ${(''+l.note).replace(/[<>&]/g,'')}</span>`:''}</td>
+      <td style="color:${pos?'var(--brand-600)':'#b23a31'};font-weight:600">${pos?'+':''}${window.CB.money(amt,club.currency)}</td></tr>`;
+  }).join('') : '<tr><td colspan="3" class="sub">Noch keine Guthaben-Bewegungen.</td></tr>';
 }
 
 async function loadAbo() {

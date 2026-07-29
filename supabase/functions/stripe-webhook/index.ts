@@ -36,6 +36,17 @@ Deno.serve(async (req) => {
     const session = event.data.object;
     if (session.payment_status !== "paid")
       return new Response(JSON.stringify({ received: true, ignored: "not paid" }), { status: 200 });
+
+    // Guthaben-Aufladung (Wallet) statt Buchung
+    const md = session.metadata ?? {};
+    if (md.type === "topup") {
+      const { error } = await admin.rpc("wallet_topup_apply", {
+        p_club: md.club_id, p_email: md.email, p_amount: Number(md.amount), p_session: session.id,
+      });
+      if (error) { console.error("topup apply error:", error); return new Response("topup error", { status: 500 }); }
+      return new Response(JSON.stringify({ received: true, topup: md.email }), { status: 200 });
+    }
+
     const bookingId = session.metadata?.booking_id ?? session.client_reference_id;
     if (!bookingId) return new Response("Missing booking id", { status: 400 });
 

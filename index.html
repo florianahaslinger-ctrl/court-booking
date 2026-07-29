@@ -72,6 +72,9 @@
       <div id="playerRows"></div>
       <button type="button" class="btn btn-ghost btn-sm" id="addPlayer" style="margin-top:8px">+ Mitspieler</button>
     </div>
+    <label id="creditRow" style="display:none;align-items:center;gap:8px;margin-top:14px;cursor:pointer">
+      <input type="checkbox" id="useCredit" style="width:auto;margin:0"> <span id="creditLabel">Mit Guthaben bezahlen</span>
+    </label>
     <div id="bookMsg" class="msg"></div>
     <div style="display:flex;gap:10px;margin-top:18px">
       <button class="btn btn-ghost" id="bookCancel" style="flex:1">Abbrechen</button>
@@ -98,7 +101,7 @@ const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 const MON = ['Jan','Feb','März','Apr','Mai','Juni','Juli','Aug','Sep','Okt','Nov','Dez'];
 
 let club=null, courts=[], hours=[], priceWindows=[], bookingTypes=[], busy=[], mine=[], myMember=null, session=null;
-let memberOptions=[], players=[];
+let memberOptions=[], players=[], myBalance=0;
 let view='day', envFilter='all', anchor=new Date(), weekCourtId=null, pending=null;
 
 const msg=(t,cls='error')=>{const m=$('#msg');m.className='msg show '+cls;m.textContent=t;};
@@ -136,6 +139,7 @@ async function init(){
   // Mitglieder-Auswahl für Mitspieler (nur für eingeloggte Mitglieder/Admins befüllt; Gäste bekommen leere Liste)
   const { data:mo }=await sb.rpc('club_member_options',{p_club_slug:slug});
   memberOptions=mo||[];
+  const { data:wb }=await sb.rpc('wallet_get',{p_club_slug:slug}); myBalance=Number(wb||0);
 
   const [{data:co},{data:oh},{data:pw},{data:bt}]=await Promise.all([
     sb.from('courts').select('*').eq('club_id',club.id).eq('active',true).order('sort'),
@@ -384,6 +388,7 @@ function guestRowsMissingName(){
 function openBooking(court,s,e){
   pending={court,s,e};
   players=[];
+  $('#useCredit').checked=false;
   renderPlayers();
   recalc();
   $('#bookMsg').className='msg';
@@ -411,6 +416,13 @@ function recalc(){
     `${persons} ${persons===1?'Person':'Personen'} · Platzpreis ${window.CB.money(unit,club.currency)} · Gesamt: <b>${window.CB.money(total,club.currency)}</b>`+
     (win&&win.label?` · <span class="badge">${esc(win.label)}</span>`:'')+
     (myMember&&rmode==='free'?' · du (Mitglied) gratis':myMember?' · Mitglieder-Preis':'');
+  // Guthaben-Option nur für eingeloggte Mitglieder mit ausreichendem Saldo
+  if(myMember && total>0 && myBalance>=total){
+    $('#creditRow').style.display='flex';
+    $('#creditLabel').textContent=`Mit Guthaben bezahlen (Saldo: ${window.CB.money(myBalance,club.currency)})`;
+  } else {
+    $('#creditRow').style.display='none'; $('#useCredit').checked=false;
+  }
 }
 
 async function confirmBooking(){
@@ -419,10 +431,11 @@ async function confirmBooking(){
   if(!myMember){name=$('#gName').value.trim();mail=$('#gMail').value.trim();
     if(!name||!mail){bm.className='msg show error';bm.textContent='Bitte Name und E-Mail angeben.';return;}}
   if(guestRowsMissingName()){bm.className='msg show error';bm.textContent='Bitte für jeden Gast-Mitspieler einen Namen angeben oder die Zeile mit ✕ entfernen.';return;}
+  const useCredit = $('#useCredit').checked && $('#creditRow').style.display!=='none';
   $('#bookConfirm').disabled=true;
   const {data,error}=await sb.rpc('create_booking',{p_club_slug:slug,p_court:court.id,
     p_start:s.toISOString(),p_end:e.toISOString(),p_guest_name:name,p_guest_email:mail,
-    p_participants:participantsPayload()});
+    p_participants:participantsPayload(),p_use_credit:useCredit});
   $('#bookConfirm').disabled=false;
   if(error){bm.className='msg show error';bm.textContent=error.message;return;}
 
@@ -437,8 +450,9 @@ async function confirmBooking(){
     return;
   }
 
+  if(data.paid_with==='credit'){ myBalance=Math.max(0, myBalance-Number(data.price)); }
   $('#bookModal').classList.remove('open');
-  msg('Buchung bestätigt! '+fmtHM(s)+'–'+fmtHM(e),'ok');
+  msg('Buchung bestätigt!'+(data.paid_with==='credit'?' Per Guthaben bezahlt.':'')+' '+fmtHM(s)+'–'+fmtHM(e),'ok');
   loadRange();
 }
 </script>
