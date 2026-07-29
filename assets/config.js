@@ -58,10 +58,11 @@ window.CB = {
       default:         return round2(base); // 'full'
     }
   },
-  // Preisfaktor für ein Mitglied auf dieser Platzart (0=gratis, <1=Rabatt, 1=voll)
+  // Preisfaktor für ein Mitglied auf dieser Platzart. Binär (wie Tennis04):
+  // gratis-Mitglied zahlt 0, sonst voller Anteil (kein Prozent-Rabatt).
   memberFactor(club, env) {
     const r = this.rules(club, env);
-    return r.mode === 'free' ? 0 : r.mode === 'discount' ? (1 - (r.disc || 0) / 100) : 1;
+    return r.mode === 'free' ? 0 : 1;
   },
   // maximal erlaubte Buchungsdauer (min) für diese Person auf diesem Platz
   maxMinutes(club, isMember, env) {
