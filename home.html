@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Court Booking – Das Buchungssystem für deinen Tennisplatz</title>
+<meta name="description" content="Modernes Online-Buchungssystem für Tennisplätze: Mitglieder & Gäste, Indoor/Outdoor, Abos, Online-Zahlung. Für Vereine und Anlagen.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --black:#070707; --dark:#0f0f0f; --panel:#161616; --line:rgba(201,168,76,.18);
+  --gold:#C9A84C; --gold-light:#E8C97A; --gold-dim:rgba(201,168,76,.13);
+  --white:#F5F0EB; --gray:#9a9488; --muted:#6f6a60;
+  --grad-gold:linear-gradient(135deg,#E8C97A 0%,#C9A84C 55%,#b0913a 100%);
+  --card-grad:linear-gradient(160deg,#151513 0%,#0d0d0c 100%);
+  --glow:0 0 0 1px rgba(201,168,76,.10), 0 30px 80px -30px rgba(201,168,76,.30);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;font-weight:300;line-height:1.6;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+.serif{font-family:'Cormorant Garamond',serif}
+.bebas{font-family:'Bebas Neue',sans-serif;letter-spacing:.06em}
+::selection{background:rgba(201,168,76,.3);color:#fff}
+img{max-width:100%}
+
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;gap:26px;
+  padding:18px 6vw;transition:background .3s,backdrop-filter .3s,padding .3s;border-bottom:1px solid transparent}
+.nav.scrolled{background:rgba(7,7,7,.78);backdrop-filter:blur(14px) saturate(1.1);border-bottom:1px solid var(--line);padding:12px 6vw}
+.nav .logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.14em;display:flex;align-items:center;gap:10px}
+.nav .logo b{color:var(--gold);font-weight:400}
+.nav .logo .mark{width:12px;height:12px;border-radius:50%;background:var(--grad-gold);box-shadow:0 0 14px rgba(201,168,76,.7)}
+.nav .links{display:flex;gap:26px;margin-left:auto;align-items:center;font-size:14px}
+.nav .links a{color:var(--gray);transition:color .2s;position:relative}
+.nav .links a:hover{color:var(--gold-light)}
+.nav .links a.cta{color:#181206;background:var(--grad-gold);padding:9px 18px;border-radius:4px;font-weight:400;box-shadow:0 10px 24px -12px rgba(201,168,76,.6);transition:transform .2s,box-shadow .2s}
+.nav .links a.cta:hover{transform:translateY(-2px);box-shadow:0 16px 30px -12px rgba(201,168,76,.8)}
+.nav .burger{display:none;margin-left:auto;background:none;border:1px solid var(--line);color:var(--gold);padding:8px 12px;border-radius:4px;cursor:pointer;font-size:18px}
+
+/* HERO */
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;padding:0 6vw;overflow:hidden}
+#webgl{position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block}
+.hero::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:radial-gradient(1200px 700px at 72% 45%,transparent 20%,rgba(7,7,7,.55) 75%,var(--black) 100%)}
+.hero-inner{position:relative;z-index:3;max-width:640px}
+.eyebrow{display:inline-flex;align-items:center;gap:12px;color:var(--gold);font-size:12px;letter-spacing:.34em;text-transform:uppercase;margin-bottom:22px}
+.eyebrow::before{content:"";width:38px;height:1px;background:var(--gold);opacity:.7}
+.hero h1{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:clamp(42px,6.4vw,80px);line-height:1.02;letter-spacing:.005em}
+.hero h1 em{font-style:italic;color:var(--gold)}
+.hero p.lead{color:var(--gray);font-size:clamp(16px,1.7vw,20px);margin:22px 0 34px;max-width:520px}
+.btn-row{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:10px;font-size:15px;letter-spacing:.04em;padding:15px 30px;border-radius:5px;cursor:pointer;transition:transform .2s,box-shadow .25s,background .25s,color .2s;border:1px solid transparent}
+.btn-gold{background:var(--grad-gold);color:#181206;box-shadow:0 14px 30px -14px rgba(201,168,76,.7)}
+.btn-gold:hover{transform:translateY(-3px);box-shadow:0 20px 40px -14px rgba(201,168,76,.85)}
+.btn-ghost{border-color:var(--gold);color:var(--gold-light)}
+.btn-ghost:hover{background:var(--gold-dim);transform:translateY(-3px)}
+.scroll-cue{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:3;color:var(--muted);font-size:11px;letter-spacing:.3em;text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:10px}
+.scroll-cue .line{width:1px;height:42px;background:linear-gradient(var(--gold),transparent);animation:cue 2s ease-in-out infinite}
+@keyframes cue{0%,100%{opacity:.3;transform:scaleY(.6)}50%{opacity:1;transform:scaleY(1)}}
+
+/* SECTIONS */
+section{position:relative;padding:110px 6vw}
+.sec-head{text-align:center;max-width:720px;margin:0 auto 60px}
+.sec-head .eyebrow{justify-content:center}
+.sec-head h2{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:clamp(32px,4.4vw,52px);line-height:1.08}
+.sec-head h2 em{font-style:italic;color:var(--gold)}
+.sec-head p{color:var(--gray);margin-top:16px;font-size:17px}
+
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s ease,transform .7s ease}
+.reveal.in{opacity:1;transform:none}
+
+/* FEATURES */
+.features{background:linear-gradient(180deg,var(--black),#0b0b0a 50%,var(--black))}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px;max-width:1140px;margin:0 auto}
+.card{position:relative;background:var(--card-grad);border:1px solid var(--line);border-radius:12px;padding:34px 30px;overflow:hidden;transition:transform .35s,border-color .35s,box-shadow .35s}
+.card::before{content:"";position:absolute;left:26px;right:26px;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.6),transparent)}
+.card:hover{transform:translateY(-6px);border-color:rgba(201,168,76,.4);box-shadow:var(--glow)}
+.card .ico{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:20px;
+  background:var(--gold-dim);border:1px solid var(--line)}
+.card h3{font-family:'Cormorant Garamond',serif;font-size:25px;font-weight:600;margin-bottom:8px}
+.card p{color:var(--gray);font-size:15px}
+
+/* STATS */
+.stats{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;max-width:1000px;margin:64px auto 0}
+.stat{flex:1 1 180px;text-align:center;background:var(--card-grad);border:1px solid var(--line);border-radius:12px;padding:30px 20px}
+.stat .n{font-family:'Bebas Neue',sans-serif;font-size:52px;color:var(--gold-light);line-height:1;text-shadow:0 0 30px rgba(201,168,76,.35)}
+.stat .l{color:var(--gray);font-size:13px;letter-spacing:.14em;text-transform:uppercase;margin-top:8px}
+
+/* STEPS */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:26px;max-width:1100px;margin:0 auto}
+.step{position:relative;padding-left:16px}
+.step .num{font-family:'Bebas Neue',sans-serif;font-size:64px;color:transparent;-webkit-text-stroke:1.4px rgba(201,168,76,.55);line-height:.9;margin-bottom:10px}
+.step h3{font-family:'Cormorant Garamond',serif;font-size:23px;font-weight:600;margin-bottom:6px}
+.step p{color:var(--gray);font-size:15px}
+
+/* CLUBS / CTA band */
+.band{background:radial-gradient(900px 500px at 50% 0%,rgba(201,168,76,.10),transparent 60%),#0b0b0a;border-top:1px solid var(--line);border-bottom:1px solid var(--line);text-align:center}
+.band h2{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:clamp(30px,4.2vw,50px);max-width:760px;margin:0 auto 18px}
+.band h2 em{font-style:italic;color:var(--gold)}
+.band p{color:var(--gray);max-width:560px;margin:0 auto 30px;font-size:17px}
+
+.pill-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:34px}
+.pill{border:1px solid var(--line);border-radius:40px;padding:9px 18px;font-size:13px;color:var(--gray);background:rgba(201,168,76,.04)}
+.pill b{color:var(--gold-light);font-weight:500}
+
+/* FOOTER */
+footer{padding:56px 6vw 40px;border-top:1px solid var(--line);background:var(--black)}
+.foot-grid{display:flex;flex-wrap:wrap;gap:30px;justify-content:space-between;max-width:1140px;margin:0 auto 30px}
+.foot-brand .logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.14em}
+.foot-brand .logo b{color:var(--gold)}
+.foot-brand p{color:var(--muted);font-size:14px;margin-top:10px;max-width:280px}
+.foot-col h4{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+.foot-col a{display:block;color:var(--gray);font-size:14px;margin-bottom:9px;transition:color .2s}
+.foot-col a:hover{color:var(--gold-light)}
+.foot-bottom{max-width:1140px;margin:0 auto;border-top:1px solid var(--line);padding-top:22px;color:var(--muted);font-size:13px;display:flex;gap:14px;flex-wrap:wrap;justify-content:space-between}
+
+@media(max-width:820px){
+  .nav .links{display:none}
+  .nav .burger{display:block}
+  .hero::after{background:radial-gradient(900px 600px at 50% 30%,transparent 10%,rgba(7,7,7,.6) 70%,var(--black) 100%)}
+  section{padding:80px 7vw}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}.reveal{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a class="logo" href="home.html"><span class="mark"></span> COURT<b>BOOKING</b></a>
+  <div class="links">
+    <a href="#features">Funktionen</a>
+    <a href="#how">So funktioniert's</a>
+    <a href="#clubs">Für Vereine</a>
+    <a href="login.html">Login</a>
+    <a class="cta" href="index.html">Platz buchen</a>
+  </div>
+  <button class="burger" id="burger" aria-label="Menü">☰</button>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <canvas id="webgl"></canvas>
+  <div class="hero-inner reveal in">
+    <span class="eyebrow">Tennisplatz-Buchung · neu gedacht</span>
+    <h1 class="serif">Dein Platz.<br>Ein <em>Klick</em>.<br>Rund um die Uhr.</h1>
+    <p class="lead">Das elegante Online-Buchungssystem für Tennisanlagen – Mitglieder & Gäste, Indoor & Outdoor, Abos und Online-Zahlung. Ohne Papierliste, ohne Anruf.</p>
+    <div class="btn-row">
+      <a class="btn btn-gold" href="index.html">Jetzt Platz buchen →</a>
+      <a class="btn btn-ghost" href="#features">Mehr erfahren</a>
+    </div>
+  </div>
+  <div class="scroll-cue"><span>Scroll</span><span class="line"></span></div>
+</header>
+
+<!-- FEATURES -->
+<section id="features" class="features">
+  <div class="sec-head reveal">
+    <span class="eyebrow">Alles drin</span>
+    <h2 class="serif">Ein System für die <em>ganze</em> Anlage</h2>
+    <p>Von der Platzreservierung bis zur Abrechnung – alles an einem Ort, sauber und schnell.</p>
+  </div>
+  <div class="grid">
+    <div class="card reveal"><div class="ico">🎾</div><h3 class="serif">Indoor & Outdoor</h3><p>Gäste wählen ihre Platzart, sehen freie Zeiten im übersichtlichen Raster und buchen in Sekunden.</p></div>
+    <div class="card reveal"><div class="ico">👥</div><h3 class="serif">Mitglieder & Gäste</h3><p>Mitglieder spielen gratis oder vergünstigt – getrennt einstellbar für Indoor und Outdoor. Gäste zahlen online.</p></div>
+    <div class="card reveal"><div class="ico">🔁</div><h3 class="serif">Abo-Slots</h3><p>Fixe Wochenslots werden automatisch für Mitglieder reserviert. Einmal einrichten, läuft von selbst.</p></div>
+    <div class="card reveal"><div class="ico">💳</div><h3 class="serif">Online-Zahlung</h3><p>Sichere Kartenzahlung über Stripe. Jeder Verein erhält seine Auszahlungen direkt aufs eigene Konto.</p></div>
+    <div class="card reveal"><div class="ico">🛠️</div><h3 class="serif">Volle Kontrolle</h3><p>Slot-Länge, Öffnungszeiten, Preise, Sperren & Gratis-Buchungen – alles selbst konfigurierbar.</p></div>
+    <div class="card reveal"><div class="ico">📊</div><h3 class="serif">Klarer Überblick</h3><p>Belegung, Buchungen und Mitglieder auf einen Blick – tages- und wochenweise.</p></div>
+  </div>
+  <div class="stats">
+    <div class="stat reveal"><div class="n">24/7</div><div class="l">buchbar</div></div>
+    <div class="stat reveal"><div class="n">0 €</div><div class="l">für Mitglieder möglich</div></div>
+    <div class="stat reveal"><div class="n">2</div><div class="l">Klicks bis zum Platz</div></div>
+    <div class="stat reveal"><div class="n">∞</div><div class="l">Plätze & Vereine</div></div>
+  </div>
+</section>
+
+<!-- HOW -->
+<section id="how">
+  <div class="sec-head reveal">
+    <span class="eyebrow">So funktioniert's</span>
+    <h2 class="serif">In <em>drei</em> Schritten am Netz</h2>
+  </div>
+  <div class="steps">
+    <div class="step reveal"><div class="num bebas">01</div><h3 class="serif">Platzart wählen</h3><p>Indoor oder Outdoor – die Seite zeigt automatisch die passende Saison-Ansicht.</p></div>
+    <div class="step reveal"><div class="num bebas">02</div><h3 class="serif">Zeit aussuchen</h3><p>Freie Slots im Tag- oder Wochenraster antippen. Belegtes ist klar markiert.</p></div>
+    <div class="step reveal"><div class="num bebas">03</div><h3 class="serif">Buchen & spielen</h3><p>Mitglied? Sofort bestätigt. Gast? Kurz online zahlen – fertig.</p></div>
+  </div>
+</section>
+
+<!-- CLUBS BAND -->
+<section id="clubs" class="band">
+  <div class="reveal">
+    <span class="eyebrow" style="justify-content:center">Für Vereine & Anlagen</span>
+    <h2 class="serif">Machen Sie Ihre Anlage <em>digital</em></h2>
+    <p>Weniger Verwaltung, mehr gespielte Stunden. Wir richten Ihr Buchungssystem ein – mit Ihren Preisen, Ihren Plätzen, Ihrer Marke.</p>
+    <div class="btn-row" style="justify-content:center">
+      <a class="btn btn-gold" href="mailto:office@core-management.at?subject=Tennis-Buchungssystem">Anlage anfragen</a>
+      <a class="btn btn-ghost" href="index.html?club=demo-tennis">Live-Demo ansehen</a>
+    </div>
+    <div class="pill-row">
+      <span class="pill"><b>Multi-Standort</b> · mehrere Anlagen</span>
+      <span class="pill"><b>Eigene Auszahlung</b> · pro Verein</span>
+      <span class="pill"><b>Mitglieder-Import</b></span>
+      <span class="pill"><b>Individuelle Farben</b></span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="foot-grid">
+    <div class="foot-brand">
+      <div class="logo">COURT<b>BOOKING</b></div>
+      <p>Das Buchungssystem für Tennisplätze. Teil der Core-Management-Produktfamilie.</p>
+    </div>
+    <div class="foot-col">
+      <h4>Produkt</h4>
+      <a href="#features">Funktionen</a>
+      <a href="#how">So funktioniert's</a>
+      <a href="index.html">Platz buchen</a>
+      <a href="login.html">Mitglieder-Login</a>
+    </div>
+    <div class="foot-col">
+      <h4>Verein</h4>
+      <a href="#clubs">Für Anlagen</a>
+      <a href="mailto:office@core-management.at">Kontakt</a>
+      <a href="admin.html">Verwaltung</a>
+    </div>
+  </div>
+  <div class="foot-bottom">
+    <span>© <span id="yr"></span> Court Booking · core-management.at</span>
+    <span>Made with 🎾 in Österreich</span>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/three@0.150.1/build/three.min.js"></script>
+<script>
+document.getElementById('yr').textContent=new Date().getFullYear();
+
+/* Nav scroll + burger */
+const nav=document.getElementById('nav');
+addEventListener('scroll',()=>nav.classList.toggle('scrolled',scrollY>40));
+document.getElementById('burger').onclick=()=>{ location.href='index.html'; };
+
+/* Scroll reveal */
+const io=new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.15});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+/* ---------- 3D: goldener Tennisball ---------- */
+(function(){
+  const canvas=document.getElementById('webgl');
+  if(!window.THREE) return;
+  const scene=new THREE.Scene();
+  scene.fog=new THREE.FogExp2(0x070707,0.11);
+
+  const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,0.1,100);
+  camera.position.set(0,0,7);
+
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+
+  /* Seam-Textur (equirektangular) auf Canvas malen: goldener Ball + dunkle Tennis-Naht */
+  function makeBallTexture(){
+    const W=1024,H=512,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+    const g=x.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#e8c97a');g.addColorStop(.5,'#c9a84c');g.addColorStop(1,'#a07f2f');
+    x.fillStyle=g;x.fillRect(0,0,W,H);
+    // feine Filz-Textur
+    for(let i=0;i<9000;i++){x.fillStyle='rgba('+(Math.random()<.5?'255,240,200':'120,95,40')+','+(Math.random()*.05)+')';x.fillRect(Math.random()*W,Math.random()*H,1.4,1.4);}
+    // Naht: eine Sinus-Kurve über die volle Breite = klassische Tennis-Kurve beim Wickeln
+    function seam(phase,amp){
+      x.beginPath();
+      for(let px=0;px<=W;px++){const y=H*0.5+Math.sin(px/W*Math.PI*2+phase)*H*amp;px===0?x.moveTo(px,y):x.lineTo(px,y);}
+    }
+    x.lineCap='round';
+    seam(0,0.26);x.strokeStyle='#181206';x.lineWidth=16;x.stroke();
+    seam(0,0.26);x.strokeStyle='rgba(232,201,122,.5)';x.lineWidth=3;x.stroke();
+    // Stiche
+    x.strokeStyle='rgba(20,14,6,.6)';x.lineWidth=2;
+    for(let px=0;px<W;px+=16){const y=H*0.5+Math.sin(px/W*Math.PI*2)*H*0.26;const dy=Math.cos(px/W*Math.PI*2)*22;x.beginPath();x.moveTo(px,y-9-dy*0);x.lineTo(px,y+9);x.stroke();}
+    const t=new THREE.CanvasTexture(c);t.anisotropy=8;return {map:t};
+  }
+  const {map}=makeBallTexture();
+  const mat=new THREE.MeshStandardMaterial({map,metalness:.72,roughness:.34,emissive:0x2a1e08,emissiveIntensity:.35});
+  const ball=new THREE.Mesh(new THREE.SphereGeometry(1.9,96,96),mat);
+  const ballGroup=new THREE.Group();ballGroup.add(ball);
+  ballGroup.position.x=2.1;ballGroup.rotation.z=0.35;
+  scene.add(ballGroup);
+
+  /* dünner Glow-Ring hinter dem Ball */
+  const ring=new THREE.Mesh(new THREE.RingGeometry(2.35,2.55,80),new THREE.MeshBasicMaterial({color:0xC9A84C,transparent:true,opacity:.12,side:THREE.DoubleSide}));
+  ring.position.copy(ballGroup.position);ring.position.z=-.5;scene.add(ring);
+
+  /* Licht */
+  scene.add(new THREE.AmbientLight(0x2a2620,.7));
+  const key=new THREE.DirectionalLight(0xfff2d0,2.1);key.position.set(4,5,6);scene.add(key);
+  const rim=new THREE.DirectionalLight(0xC9A84C,1.6);rim.position.set(-6,-2,-3);scene.add(rim);
+  const fill=new THREE.PointLight(0xE8C97A,0.8,30);fill.position.set(-3,2,4);scene.add(fill);
+
+  /* Gold-Partikel */
+  const N=520,pg=new THREE.BufferGeometry(),pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){pos[i*3]=(Math.random()-.5)*22;pos[i*3+1]=(Math.random()-.5)*14;pos[i*3+2]=(Math.random()-.5)*12-2;}
+  pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const particles=new THREE.Points(pg,new THREE.PointsMaterial({color:0xC9A84C,size:.035,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false}));
+  scene.add(particles);
+
+  /* Parallax */
+  let mx=0,my=0,tx=0,ty=0;
+  addEventListener('mousemove',e=>{tx=(e.clientX/innerWidth-.5);ty=(e.clientY/innerHeight-.5);});
+
+  let running=true;document.addEventListener('visibilitychange',()=>running=!document.hidden);
+  const clock=new THREE.Clock();
+  function loop(){
+    requestAnimationFrame(loop);if(!running)return;
+    const t=clock.getElapsedTime();
+    ball.rotation.y+=0.006;ball.rotation.x=Math.sin(t*.3)*.12;
+    ballGroup.position.y=Math.sin(t*.8)*.16;
+    ring.position.y=ballGroup.position.y;ring.rotation.z+=0.002;
+    particles.rotation.y+=0.0006;particles.rotation.x+=0.0002;
+    mx+=(tx-mx)*.05;my+=(ty-my)*.05;
+    camera.position.x=mx*1.2;camera.position.y=-my*.9;camera.lookAt(1.1,0,0);
+    renderer.render(scene,camera);
+  }
+  loop();
+
+  addEventListener('resize',()=>{
+    camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+    // Ball auf kleinen Screens zentrieren
+    const small=innerWidth<820;ballGroup.position.x=small?0:2.1;ring.position.x=ballGroup.position.x;
+  });
+  dispatchEvent(new Event('resize'));
+})();
+</script>
+</body>
+</html>
