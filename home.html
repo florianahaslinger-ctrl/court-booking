@@ -13,7 +13,7 @@
   --brand:#2E8B57; --brand-600:#26794b; --brand-700:#1e6640; --brand-50:#eaf6ef;
   --bg:#f6f8f7; --surface:#ffffff; --surface-2:#eef2f0; --line:#e2e8e5; --line-strong:#cdd6d1;
   --ink:#17211c; --ink-soft:#48564f; --muted:#7c8a83;
-  --indoor:#3b7dd8; --outdoor:#e08a2b; --ball:#c6dc34;
+  --indoor:#3b7dd8; --outdoor:#e08a2b;
   --radius:16px; --shadow:0 1px 2px rgba(16,32,24,.05),0 16px 40px -22px rgba(16,32,24,.25);
   --shadow-lg:0 30px 70px -30px rgba(16,32,24,.4);
   --grad:linear-gradient(135deg,#3aa568 0%,#2E8B57 60%,#26794b 100%);
@@ -26,9 +26,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font);font-weight:4
 a{color:inherit;text-decoration:none}
 h1,h2,h3{font-family:var(--display);font-weight:700;line-height:1.1;letter-spacing:-.02em}
 ::selection{background:var(--brand-50);color:var(--brand-700)}
-img{max-width:100%}
+img,svg{max-width:100%}
 
-/* NAV */
 .nav{position:fixed;inset:0 0 auto 0;z-index:50;display:flex;align-items:center;gap:26px;padding:18px 6vw;transition:.3s}
 .nav.scrolled{background:rgba(246,248,247,.82);backdrop-filter:blur(14px) saturate(1.1);border-bottom:1px solid var(--line);padding:12px 6vw}
 .nav .logo{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
@@ -43,9 +42,17 @@ img{max-width:100%}
 /* HERO */
 .hero{position:relative;min-height:100vh;display:flex;align-items:center;padding:0 6vw;overflow:hidden}
 .hero::before{content:"";position:absolute;z-index:0;inset:0;
-  background:radial-gradient(760px 620px at 78% 42%,rgba(46,139,87,.12),transparent 62%),
-             radial-gradient(600px 500px at 12% 8%,rgba(59,125,216,.07),transparent 60%),var(--bg)}
-#webgl{position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block}
+  background:radial-gradient(780px 640px at 80% 40%,rgba(46,139,87,.13),transparent 62%),
+             radial-gradient(620px 520px at 8% 6%,rgba(59,125,216,.07),transparent 60%),var(--bg)}
+/* flacher Tennisplatz als Hintergrund-Illustration */
+.hero-art{position:absolute;z-index:1;right:-6vw;top:50%;width:min(60vw,780px);pointer-events:none;
+  transform:translateY(-50%) rotate(-13deg);transform-origin:center;
+  filter:drop-shadow(0 44px 60px rgba(16,32,24,.20));opacity:.92;animation:floaty 10s ease-in-out infinite}
+.hero-art svg{width:100%;height:auto;display:block;border-radius:14px}
+@keyframes floaty{0%,100%{transform:translateY(-50%) rotate(-13deg)}50%{transform:translateY(-53.5%) rotate(-13deg)}}
+/* Textseite sauber halten */
+.hero::after{content:"";position:absolute;z-index:2;inset:0;pointer-events:none;
+  background:linear-gradient(90deg,var(--bg) 8%,rgba(246,248,247,.6) 34%,transparent 58%)}
 .hero-inner{position:relative;z-index:3;max-width:640px}
 .eyebrow{display:inline-flex;align-items:center;gap:11px;color:var(--brand-600);font-size:12.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;margin-bottom:20px}
 .eyebrow::before{content:"";width:34px;height:2px;border-radius:2px;background:var(--brand)}
@@ -62,7 +69,6 @@ img{max-width:100%}
 .scroll-cue .line{width:2px;height:40px;border-radius:2px;background:linear-gradient(var(--brand),transparent);animation:cue 2s ease-in-out infinite}
 @keyframes cue{0%,100%{opacity:.3;transform:scaleY(.6)}50%{opacity:1;transform:scaleY(1)}}
 
-/* SECTIONS */
 section{position:relative;padding:110px 6vw}
 .sec-head{text-align:center;max-width:720px;margin:0 auto 56px}
 .sec-head .eyebrow{justify-content:center}
@@ -72,7 +78,6 @@ section{position:relative;padding:110px 6vw}
 .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
 .reveal.in{opacity:1;transform:none}
 
-/* FEATURES */
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;max-width:1140px;margin:0 auto}
 .card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:32px 28px;box-shadow:var(--shadow);transition:transform .35s,border-color .35s,box-shadow .35s}
 .card:hover{transform:translateY(-6px);border-color:var(--brand);box-shadow:var(--shadow-lg)}
@@ -80,33 +85,28 @@ section{position:relative;padding:110px 6vw}
 .card h3{font-size:21px;margin-bottom:7px}
 .card p{color:var(--ink-soft);font-size:15px}
 
-/* STATS */
 .stats{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;max-width:1000px;margin:56px auto 0}
 .stat{flex:1 1 180px;text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px 20px;box-shadow:var(--shadow)}
 .stat .n{font-family:var(--display);font-weight:700;font-size:46px;color:var(--brand);line-height:1}
 .stat .l{color:var(--muted);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;margin-top:8px}
 
-/* STEPS */
 .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:24px;max-width:1100px;margin:0 auto}
 .step .num{font-family:var(--display);font-weight:700;font-size:20px;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--brand);color:#fff;margin-bottom:16px;box-shadow:0 12px 24px -12px rgba(46,139,87,.7)}
 .step h3{font-size:20px;margin-bottom:6px}
 .step p{color:var(--ink-soft);font-size:15px}
 
-/* BAND / CTA */
-.band{background:var(--grad);color:#fff;text-align:center;border-radius:0}
+.band{background:var(--grad);color:#fff;text-align:center}
 .band .eyebrow{color:rgba(255,255,255,.85)}
 .band .eyebrow::before{background:rgba(255,255,255,.85)}
 .band h2{font-size:clamp(30px,4.2vw,50px);max-width:760px;margin:0 auto 16px;letter-spacing:-.03em}
 .band p{color:rgba(255,255,255,.9);max-width:560px;margin:0 auto 30px;font-size:17px}
 .band .btn-primary{background:#fff;color:var(--brand-700)}
-.band .btn-primary:hover{background:#fff;color:var(--brand-700)}
 .band .btn-ghost{background:transparent;border-color:rgba(255,255,255,.6);color:#fff}
 .band .btn-ghost:hover{border-color:#fff;color:#fff;background:rgba(255,255,255,.1)}
 .pill-row{display:flex;gap:11px;flex-wrap:wrap;justify-content:center;margin-top:32px}
 .pill{border:1px solid rgba(255,255,255,.35);border-radius:40px;padding:9px 17px;font-size:13px;color:rgba(255,255,255,.92);background:rgba(255,255,255,.08)}
 .pill b{font-weight:600}
 
-/* FOOTER */
 footer{padding:56px 6vw 38px;border-top:1px solid var(--line);background:var(--surface)}
 .foot-grid{display:flex;flex-wrap:wrap;gap:30px;justify-content:space-between;max-width:1140px;margin:0 auto 28px}
 .foot-brand .logo{font-family:var(--display);font-weight:700;font-size:20px;display:flex;align-items:center;gap:9px}
@@ -117,7 +117,6 @@ footer{padding:56px 6vw 38px;border-top:1px solid var(--line);background:var(--s
 .foot-col a:hover{color:var(--brand-600)}
 .foot-bottom{max-width:1140px;margin:0 auto;border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:13px;display:flex;gap:14px;flex-wrap:wrap;justify-content:space-between}
 
-/* Mobile menu */
 .mobile{display:none;position:fixed;inset:0;z-index:49;background:rgba(246,248,247,.97);backdrop-filter:blur(8px);flex-direction:column;align-items:center;justify-content:center;gap:8px}
 .mobile.open{display:flex}
 .mobile a{font-family:var(--display);font-weight:600;font-size:22px;color:var(--ink);padding:12px}
@@ -125,10 +124,11 @@ footer{padding:56px 6vw 38px;border-top:1px solid var(--line);background:var(--s
 @media(max-width:860px){
   .nav .links{display:none}.nav .burger{display:block}
   section{padding:80px 7vw}
-  .hero{align-items:flex-end;padding-bottom:9vh}
-  .hero::before{background:radial-gradient(620px 520px at 50% 26%,rgba(46,139,87,.14),transparent 62%),var(--bg)}
+  .hero{align-items:center}
+  .hero::after{background:linear-gradient(180deg,var(--bg) 20%,rgba(246,248,247,.55) 55%,transparent)}
+  .hero-art{right:-30vw;width:150vw;opacity:.16;top:56%}
 }
-@media(prefers-reduced-motion:reduce){*{animation:none!important}.reveal{opacity:1;transform:none;transition:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}.reveal{opacity:1;transform:none;transition:none}.hero-art{transform:translateY(-50%) rotate(-13deg)}}
 </style>
 </head>
 <body>
@@ -152,9 +152,45 @@ footer{padding:56px 6vw 38px;border-top:1px solid var(--line);background:var(--s
   <a class="cta" href="index.html">Platz buchen</a>
 </div>
 
-<!-- HERO -->
 <header class="hero">
-  <canvas id="webgl"></canvas>
+  <!-- Hintergrund: flacher Tennisplatz -->
+  <div class="hero-art" aria-hidden="true">
+    <svg viewBox="0 0 700 355" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="apron" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#2f855a"/><stop offset="1" stop-color="#276a49"/>
+        </linearGradient>
+        <linearGradient id="court" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#42b377"/><stop offset="1" stop-color="#31955f"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="700" height="355" rx="16" fill="url(#apron)"/>
+      <rect x="30" y="30" width="640" height="295" fill="url(#court)"/>
+      <g fill="none" stroke="#ffffff" stroke-width="3.4" opacity="0.92">
+        <!-- Doppel-Außenlinien -->
+        <rect x="30" y="30" width="640" height="295"/>
+        <!-- Einzel-Seitenlinien -->
+        <line x1="30" y1="67" x2="670" y2="67"/>
+        <line x1="30" y1="288" x2="670" y2="288"/>
+        <!-- Aufschlaglinien -->
+        <line x1="178" y1="67" x2="178" y2="288"/>
+        <line x1="522" y1="67" x2="522" y2="288"/>
+        <!-- Mittel-Aufschlaglinie -->
+        <line x1="178" y1="177.5" x2="522" y2="177.5"/>
+        <!-- Mittelmarken -->
+        <line x1="30" y1="177.5" x2="44" y2="177.5"/>
+        <line x1="656" y1="177.5" x2="670" y2="177.5"/>
+      </g>
+      <!-- Netz -->
+      <line x1="350" y1="22" x2="350" y2="333" stroke="#ffffff" stroke-width="4.5" opacity="0.95"/>
+      <g stroke="#ffffff" stroke-width="1" opacity="0.5">
+        <line x1="342" y1="30" x2="342" y2="325"/><line x1="358" y1="30" x2="358" y2="325"/>
+        <line x1="346" y1="30" x2="346" y2="325"/><line x1="354" y1="30" x2="354" y2="325"/>
+      </g>
+      <rect x="341" y="22" width="18" height="311" fill="#ffffff" opacity="0.10"/>
+    </svg>
+  </div>
+
   <div class="hero-inner reveal in">
     <span class="eyebrow">Tennisplatz-Buchung · neu gedacht</span>
     <h1>Dein Platz.<br>Ein <em>Klick</em>.<br>Rund um die Uhr.</h1>
@@ -167,7 +203,6 @@ footer{padding:56px 6vw 38px;border-top:1px solid var(--line);background:var(--s
   <div class="scroll-cue"><span>Scroll</span><span class="line"></span></div>
 </header>
 
-<!-- FEATURES -->
 <section id="features">
   <div class="sec-head reveal">
     <span class="eyebrow">Alles drin</span>
@@ -190,7 +225,6 @@ footer{padding:56px 6vw 38px;border-top:1px solid var(--line);background:var(--s
   </div>
 </section>
 
-<!-- HOW -->
 <section id="how" style="background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
   <div class="sec-head reveal">
     <span class="eyebrow">So funktioniert's</span>
@@ -203,7 +237,6 @@ footer{padding:56px 6vw 38px;border-top:1px solid var(--line);background:var(--s
   </div>
 </section>
 
-<!-- CLUBS BAND -->
 <section id="clubs" class="band">
   <div class="reveal">
     <span class="eyebrow" style="justify-content:center">Für Vereine & Anlagen</span>
@@ -243,7 +276,6 @@ footer{padding:56px 6vw 38px;border-top:1px solid var(--line);background:var(--s
   </div>
 </footer>
 
-<script src="https://unpkg.com/three@0.150.1/build/three.min.js"></script>
 <script>
 document.getElementById('yr').textContent=new Date().getFullYear();
 const nav=document.getElementById('nav');
@@ -253,98 +285,6 @@ document.getElementById('burger').onclick=()=>mobile.classList.toggle('open');
 mobile.querySelectorAll('a').forEach(a=>a.onclick=()=>mobile.classList.remove('open'));
 const io=new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.14});
 document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
-
-/* ---------- 3D: realistischer Tennisball ---------- */
-(function(){
-  const canvas=document.getElementById('webgl');
-  if(!window.THREE) return;
-  const scene=new THREE.Scene();
-  const camera=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,0.1,100);
-  camera.position.set(0,0,7);
-  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-  renderer.setSize(innerWidth,innerHeight);
-
-  const R=1.95;
-  const isSmall = innerWidth < 860 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-  const TEX = isSmall ? 2048 : 8192;                 // 8K-Textur auf Desktop, 2K auf Mobil
-  const W = TEX, H = TEX/2, SF = W/1024;              // Detail skaliert mit Auflösung
-  const maxAniso = renderer.capabilities.getMaxAnisotropy();
-
-  // Dunkler optisch-gelber Filz (Farbe) – feine Fasern
-  function feltColor(){
-    const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
-    const g=x.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,'#bcc932');g.addColorStop(.5,'#93a410');g.addColorStop(1,'#76850a');
-    x.fillStyle=g;x.fillRect(0,0,W,H);
-    const n=Math.round(W*H/150);
-    for(let i=0;i<n;i++){const l=Math.random();
-      x.strokeStyle='rgba('+(l<.5?'200,218,110':'96,110,12')+','+(0.04+Math.random()*0.07)+')';
-      x.lineWidth=(Math.random()*1.1+.3)*SF;
-      const px=Math.random()*W,py=Math.random()*H,ang=Math.random()*6.28,r=(Math.random()*2.6+.8)*SF;
-      x.beginPath();x.moveTo(px,py);x.lineTo(px+Math.cos(ang)*r,py+Math.sin(ang)*r);x.stroke();}
-    const t=new THREE.CanvasTexture(c);t.anisotropy=maxAniso;return t;
-  }
-  // Filz-Relief (Bump) – feinkörnig
-  function feltBump(){
-    const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
-    x.fillStyle='#7d7d7d';x.fillRect(0,0,W,H);
-    const n=Math.round(W*H/150);
-    for(let i=0;i<n;i++){const v=Math.random()*255|0;x.fillStyle='rgba('+v+','+v+','+v+',.45)';x.fillRect(Math.random()*W,Math.random()*H,1.5*SF,1.5*SF);}
-    const t=new THREE.CanvasTexture(c);t.anisotropy=maxAniso;return t;
-  }
-  const ball=new THREE.Mesh(new THREE.SphereGeometry(R,220,220),
-    new THREE.MeshStandardMaterial({map:feltColor(),bumpMap:feltBump(),bumpScale:0.032,roughness:0.985,metalness:0,emissive:0x2e3600,emissiveIntensity:0.07}));
-
-  // Echte Tennisball-Naht: Kurve liegt exakt auf der Kugel (x²+y²+z²=1)
-  const a=0.44, pts=[];
-  for(let i=0;i<=280;i++){const t=i/280*Math.PI*2;
-    const cx=(1-a)*Math.cos(t)+a*Math.cos(3*t);
-    const cy=(1-a)*Math.sin(t)-a*Math.sin(3*t);
-    const cz=2*Math.sqrt(a*(1-a))*Math.sin(2*t);
-    pts.push(new THREE.Vector3(cx,cz,cy).multiplyScalar(R));
-  }
-  const curve=new THREE.CatmullRomCurve3(pts,true);
-  const seam=new THREE.Mesh(new THREE.TubeGeometry(curve,900,0.044,24,true),
-    new THREE.MeshStandardMaterial({color:0xeef0e0,roughness:0.72,metalness:0}));
-
-  const spin=new THREE.Group();spin.add(ball);spin.add(seam);spin.rotation.x=0.3;spin.rotation.z=0.12;
-  const group=new THREE.Group();group.add(spin);group.position.x=2.2;scene.add(group);
-
-  // Weiches Bodenschatten-Oval unter dem Ball
-  const shc=document.createElement('canvas');shc.width=shc.height=256;const sx=shc.getContext('2d');
-  const rg=sx.createRadialGradient(128,128,10,128,128,128);rg.addColorStop(0,'rgba(20,40,28,.35)');rg.addColorStop(1,'rgba(20,40,28,0)');
-  sx.fillStyle=rg;sx.fillRect(0,0,256,256);
-  const shadow=new THREE.Mesh(new THREE.PlaneGeometry(6,6),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(shc),transparent:true,depthWrite:false}));
-  shadow.rotation.x=-Math.PI/2.1;shadow.position.set(group.position.x,-2.15,0);scene.add(shadow);
-
-  // Tageslicht
-  scene.add(new THREE.HemisphereLight(0xffffff,0x55663c,0.5));
-  const key=new THREE.DirectionalLight(0xfff6df,1.15);key.position.set(4,6,5);scene.add(key);
-  const rim=new THREE.DirectionalLight(0xcfe890,0.5);rim.position.set(-5,1,-4);scene.add(rim);
-  const fill=new THREE.DirectionalLight(0xdfeee4,0.28);fill.position.set(-3,-2,4);scene.add(fill);
-
-  let tx=0,ty=0,mx=0,my=0;
-  addEventListener('mousemove',e=>{tx=e.clientX/innerWidth-.5;ty=e.clientY/innerHeight-.5;});
-  let running=true;document.addEventListener('visibilitychange',()=>running=!document.hidden);
-  const clock=new THREE.Clock();
-  function loop(){
-    requestAnimationFrame(loop);if(!running)return;
-    const t=clock.getElapsedTime();
-    spin.rotation.y+=0.005;spin.rotation.x=0.3+Math.sin(t*.4)*.06;
-    group.position.y=Math.sin(t*.8)*.15;
-    mx+=(tx-mx)*.05;my+=(ty-my)*.05;
-    camera.position.x=mx*1.1;camera.position.y=-my*.8;camera.lookAt(1.2,0,0);
-    renderer.render(scene,camera);
-  }
-  loop();
-  addEventListener('resize',()=>{
-    camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
-    const small=innerWidth<860;const gx=small?0:2.2;group.position.x=gx;shadow.position.x=gx;
-    group.scale.setScalar(small?0.82:1);
-  });
-  dispatchEvent(new Event('resize'));
-})();
 </script>
 </body>
 </html>
