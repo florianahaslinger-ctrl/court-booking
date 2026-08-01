@@ -275,12 +275,15 @@ function renderDay(host){
     for(const c of cols){
       const s=new Date(`${dstr}T${fromMin(m)}:00`).getTime(), e=s+step*60000;
       const st=cellStatus(c.id,s,e);
-      let label=st==='mine'?'meine':st==='busy'?'belegt':st==='free'?'':'–', attrs='';
-      if(st==='busy'){
+      let label=st==='free'?'':(st==='closed'?'–':''), attrs='';
+      if(st==='mine'){
+        const iv=busyAt(c.id,s,e); const nm=(iv&&iv.label)?iv.label:'Meine Buchung';
+        label=short(nm); attrs=` title="${esc(nm)}"`;
+      } else if(st==='busy'){
         const iv=busyAt(c.id,s,e);
-        if(iv&&iv.typeColor){const disp=iv.typeName||iv.label||'belegt'; label=short(disp);
-          attrs=` title="${esc(disp)}" style="background:${esc(iv.typeColor)};background-image:none;color:${textOn(iv.typeColor)}"`;}
-        else if(iv&&iv.label){label=short(iv.label); attrs=` title="${esc(iv.label)}"`;}
+        const disp=(iv&&(iv.typeName||iv.label))?(iv.typeName||iv.label):'belegt'; label=short(disp);
+        if(iv&&iv.typeColor) attrs=` title="${esc(disp)}" style="background:${esc(iv.typeColor)};background-image:none;color:${textOn(iv.typeColor)}"`;
+        else attrs=` title="${esc(disp)}"`;
       } else if(st==='free'){
         const col=windowColorFor(c,s); if(col) attrs=` data-tint style="--tint:${esc(col)}2e"`;
       }
@@ -324,16 +327,19 @@ function renderWeek(host){
         if(!inside){body+=`<td class="bk-cell closed${sep}"></td>`;return;}
         const s=new Date(`${ymd(d)}T${fromMin(m)}:00`).getTime(), e=s+step*60000;
         const st=cellStatus(c.id,s,e);
-        const label=st==='mine'?'✓':'';
-        let attrs='';
-        if(st==='busy'){
+        let label='', attrs='';
+        if(st==='mine'){
+          const iv=busyAt(c.id,s,e); const nm=(iv&&iv.label)?iv.label:'Meine';
+          label=short(nm,9); attrs=` title="${esc(nm)}"`;
+        } else if(st==='busy'){
           const iv=busyAt(c.id,s,e);
-          if(iv&&iv.typeColor) attrs=` title="${esc(iv.typeName||iv.label||'')}" style="background:${esc(iv.typeColor)};background-image:none"`;
-          else if(iv&&iv.label) attrs=` title="${esc(iv.label)}"`;
+          const disp=(iv&&(iv.typeName||iv.label))?(iv.typeName||iv.label):'belegt'; label=short(disp,9);
+          if(iv&&iv.typeColor) attrs=` title="${esc(disp)}" style="background:${esc(iv.typeColor)};background-image:none;color:${textOn(iv.typeColor)}"`;
+          else attrs=` title="${esc(disp)}"`;
         } else if(st==='free'){
           const col=windowColorFor(c,s); if(col) attrs=` data-tint style="--tint:${esc(col)}2e"`;
         }
-        body+=`<td class="bk-cell ${st}${sep}"${attrs} ${st==='free'?`data-book="${c.id}|${s}|${e}"`:''}>${label}</td>`;
+        body+=`<td class="bk-cell wk ${st}${sep}"${attrs} ${st==='free'?`data-book="${c.id}|${s}|${e}"`:''}>${esc(label)}</td>`;
       });
     });
     body+=`</tr>`;
