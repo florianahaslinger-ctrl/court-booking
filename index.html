@@ -346,6 +346,13 @@ function renderWeek(host){
   }
   host.innerHTML=`<div class="grid-scroll"><table class="bk-grid week"><thead>${h1}${h2}</thead><tbody>${body}</tbody></table></div>`;
   wireCells(courts);
+  // Automatisch zum ersten buchbaren (freien) Feld scrollen – sonst liegen bei
+  // laufender Woche die vergangenen Tage links und die freien Felder unsichtbar rechts.
+  const gs=host.querySelector('.grid-scroll');
+  const ff=gs&&gs.querySelector('.bk-cell.free[data-book]');
+  // offsetLeft ist viewport-unabhängig (relativ zur Tabelle) -> zuverlässig.
+  // Synchron + kurzer Timeout als Backup (rAF feuert nicht in Hintergrund-Tabs).
+  if(gs&&ff){ const x=Math.max(0, ff.offsetLeft-90); gs.scrollLeft=x; setTimeout(()=>{gs.scrollLeft=x;},80); }
 }
 
 function wireCells(courtPool){
