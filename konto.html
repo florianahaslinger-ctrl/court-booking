@@ -27,6 +27,15 @@
 
   <div id="msg" class="msg"></div>
 
+  <div class="card" id="memCard" style="display:none">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <h2 style="flex:1;margin:0">Meine Mitgliedschaft</h2>
+      <div id="memStatus"></div>
+    </div>
+    <span class="sub" id="memSub"></span>
+    <div style="margin-top:12px"><button class="btn btn-primary" id="memPayBtn">Mitgliedschaft bezahlen / verlängern</button></div>
+  </div>
+
   <div class="card" id="walletCard" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <h2 style="flex:1;margin:0">Mein Guthaben</h2>
@@ -64,6 +73,17 @@
   </div>
 </div>
 
+<!-- Mitgliedschafts-Pop-up -->
+<div class="modal-backdrop" id="memModal">
+  <div class="modal">
+    <h2>Mitgliedschaft</h2>
+    <p class="sub" id="memModalSub">Wähle deinen Tarif und bezahle sicher online.</p>
+    <div id="memPlans" style="margin-top:6px"></div>
+    <div id="memMsg" class="msg"></div>
+    <button class="btn btn-ghost" id="memClose" style="width:100%;margin-top:14px">Später</button>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/config.js"></script>
 <script>
@@ -74,14 +94,14 @@ const slug = params.get('club') || window.CB_CONFIG.DEFAULT_CLUB;
 const $ = s => document.querySelector(s);
 const msg = (t, cls='error') => { const m=$('#msg'); m.className='msg show '+cls; m.textContent=t; };
 const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
-let club = null, member = null;
+let club = null, member = null, myEmail = null;
 
 init();
 
 async function init() {
   const { data:{ session } } = await sb.auth.getSession();
   if (!session) { location.href = 'login.html' + location.search; return; }
-  const email = session.user.email;
+  const email = session.user.email; myEmail = email;
 
   const { data:c } = await sb.from('club_public').select('*').eq('slug', slug).maybeSingle();
   club = c;
@@ -105,6 +125,10 @@ async function init() {
   loadBookings();
   loadAbo();
   loadWallet();
+  loadMembership();
+
+  $('#memPayBtn').onclick = ()=> $('#memModal').classList.add('open');
+  $('#memClose').onclick = ()=>{ $('#memModal').classList.remove('open'); sessionStorage.setItem('cb_mem_dismissed','1'); };
 
   $('#topupBtn').onclick = async () => {
     if(!member) return;
@@ -119,7 +143,9 @@ async function init() {
   const rp=new URLSearchParams(location.search);
   if(rp.get('topup')){ msg('Aufladung erfolgreich – dein Guthaben wird aktualisiert. 🎾','ok'); setTimeout(loadWallet,1500); }
   else if(rp.get('topup_cancelled')){ msg('Aufladung abgebrochen.','info'); }
-  if(rp.get('topup')||rp.get('topup_cancelled')){ const u=new URL(location.href); u.searchParams.delete('topup'); u.searchParams.delete('topup_cancelled'); history.replaceState({},'',u); }
+  else if(rp.get('mpaid')){ msg('Zahlung erfolgreich – deine Mitgliedschaft wurde verlängert. Danke! 🎾','ok'); sessionStorage.setItem('cb_mem_dismissed','1'); setTimeout(refreshMember,1500); }
+  else if(rp.get('mcancelled')){ msg('Zahlung abgebrochen.','info'); }
+  const _c=['topup','topup_cancelled','mpaid','mcancelled']; if(_c.some(k=>rp.get(k))){ const u=new URL(location.href); _c.forEach(k=>u.searchParams.delete(k)); history.replaceState({},'',u); }
 
   $('#logoutBtn').addEventListener('click', async (e)=>{ e.preventDefault(); await sb.auth.signOut(); location.href='login.html'+location.search; });
 }
@@ -188,6 +214,56 @@ async function loadAbo() {
       <div class="sub">Gültig ${new Date(a.valid_from).toLocaleDateString('de-AT')} – ${new Date(a.valid_until).toLocaleDateString('de-AT')}</div>
     </div>`;
   }).join('');
+}
+
+async function refreshMember(){
+  const { data:m } = await sb.from('members').select('*').eq('club_id',club.id).ilike('email',myEmail).maybeSingle();
+  member=m;
+  if(member&&member.active){
+    const lbl=(x,d)=>({free:'gratis',discount:(d||0)+'% Rabatt',full:'voller Preis'})[x];
+    $('#memberLine').innerHTML=`<span class="badge member">✓ Aktives Mitglied</span> — Outdoor: ${lbl(club.member_pricing_mode_outdoor,club.member_discount_percent_outdoor)}, Indoor: ${lbl(club.member_pricing_mode_indoor,club.member_discount_percent_indoor)}.`;
+  }
+  loadMembership(); loadWallet(); loadAbo();
+}
+
+async function loadMembership(){
+  const { data:plans } = await sb.from('membership_plans').select('*').eq('club_id',club.id).eq('active',true).order('sort').order('price');
+  const list=plans||[];
+  const card=$('#memCard');
+  if(list.length===0 && !member){ card.style.display='none'; $('#memModal').classList.remove('open'); return; }
+  const today=new Date(); today.setHours(0,0,0,0);
+  const vu=(member&&member.valid_until)? new Date(member.valid_until+'T00:00:00') : null;
+  const activeMem=!!(member&&member.active&&(!vu||vu>=today));
+  const daysLeft=vu? Math.round((vu-today)/86400000) : null;
+  card.style.display='block';
+  if(activeMem){
+    $('#memStatus').innerHTML='<span class="badge member">✓ aktiv</span>';
+    $('#memSub').textContent=vu?`Gültig bis ${vu.toLocaleDateString('de-AT')}${daysLeft!=null&&daysLeft<=30?` · läuft in ${daysLeft} Tagen ab`:''}.`:'Deine Mitgliedschaft ist aktiv.';
+  } else if(member){
+    $('#memStatus').innerHTML='<span class="badge bad">abgelaufen</span>';
+    $('#memSub').textContent=vu?`Abgelaufen am ${vu.toLocaleDateString('de-AT')}. Jetzt verlängern.`:'Deine Mitgliedschaft ist nicht aktiv.';
+  } else {
+    $('#memStatus').innerHTML='<span class="badge">kein Mitglied</span>';
+    $('#memSub').textContent='Werde Mitglied und buche vergünstigt.';
+  }
+  const cur=club.currency;
+  const durTxt=n=>{ if(n%365===0) return (n/365)+' Jahr'+(n/365>1?'e':''); if(n%30===0) return (n/30)+' Monat'+(n/30>1?'e':''); return n+' Tage'; };
+  $('#memPayBtn').style.display=list.length?'inline-flex':'none';
+  $('#memPlans').innerHTML = list.length ? list.map(p=>`
+    <div class="card" style="box-shadow:none;border-color:var(--line);margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="flex:1"><b>${(''+p.name).replace(/[<>&]/g,'')}</b><div class="sub">${durTxt(p.duration_days)} · ${window.CB.money(p.price,cur)}</div></div>
+      <button class="btn btn-primary btn-sm" data-payplan="${p.id}">Jetzt bezahlen</button>
+    </div>`).join('') : '<p class="sub">Zurzeit keine Tarife verfügbar.</p>';
+  $('#memPlans').querySelectorAll('[data-payplan]').forEach(b=>b.onclick=()=>payMembership(b.dataset.payplan));
+  const needs = list.length && (!activeMem || (daysLeft!=null && daysLeft<=14));
+  if(needs && !sessionStorage.getItem('cb_mem_dismissed')) $('#memModal').classList.add('open');
+}
+
+async function payMembership(planId){
+  const mm=$('#memMsg'); mm.className='msg show info'; mm.textContent='Weiterleitung zur Zahlung…';
+  const { data, error } = await sb.functions.invoke('membership-checkout',{ body:{ club_slug:slug, email:myEmail, plan_id:planId }});
+  if(data?.url){ location.href=data.url; return; }
+  mm.className='msg show error'; mm.textContent=(data&&data.error)||error?.message||'Zahlung konnte nicht gestartet werden.';
 }
 </script>
 </body>

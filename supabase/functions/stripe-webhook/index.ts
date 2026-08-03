@@ -47,6 +47,15 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ received: true, topup: md.email }), { status: 200 });
     }
 
+    // Online-Mitgliedschaft
+    if (md.type === "membership") {
+      const { error } = await admin.rpc("membership_pay_apply", {
+        p_plan: md.plan_id, p_email: md.email, p_session: session.id,
+      });
+      if (error) { console.error("membership apply error:", error); return new Response("membership error", { status: 500 }); }
+      return new Response(JSON.stringify({ received: true, membership: md.email }), { status: 200 });
+    }
+
     const bookingId = session.metadata?.booking_id ?? session.client_reference_id;
     if (!bookingId) return new Response("Missing booking id", { status: 400 });
 

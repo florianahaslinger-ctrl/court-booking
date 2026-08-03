@@ -204,6 +204,22 @@
       <div class="card"><div class="table-scroll"><table class="data" id="memberTable">
         <thead><tr><th>Name</th><th>E-Mail</th><th>Status</th><th>Gültig bis</th><th></th></tr></thead><tbody></tbody>
       </table></div></div>
+
+      <div class="card">
+        <h2>Mitgliedschafts-Tarife (Online-Zahlung)</h2>
+        <span class="sub">Tarife, die Mitglieder direkt in ihrem Konto online bezahlen können – modular in Name, Preis und Dauer.</span>
+        <div class="field-row" style="margin-top:10px">
+          <div><label>Name</label><input type="text" id="mplName" placeholder="Jahresmitgliedschaft 2026"></div>
+          <div><label>Preis (€)</label><input type="number" id="mplPrice" value="0" min="0" step="0.5"></div>
+          <div style="flex:0 0 110px"><label>Dauer</label><input type="number" id="mplDur" value="1" min="1"></div>
+          <div style="flex:0 0 130px"><label>Einheit</label><select id="mplUnit"><option value="365">Jahre</option><option value="30">Monate</option><option value="1">Tage</option></select></div>
+        </div>
+        <div id="mplMsg" class="msg"></div>
+        <button class="btn btn-primary" id="mplAdd" style="margin-top:12px">Tarif hinzufügen</button>
+        <div class="table-scroll" style="margin-top:14px"><table class="data" id="planTable">
+          <thead><tr><th>Name</th><th>Preis</th><th>Dauer</th><th>Aktiv</th><th></th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
     </div>
 
     <!-- GUTHABEN -->
@@ -277,6 +293,7 @@
         <h2>Club-Admins</h2>
         <span class="sub">Weitere Personen, die diesen Club verwalten dürfen. Sie melden sich mit ihrer E-Mail unter der Login-Seite an.</span>
         <div class="field-row" style="margin-top:10px">
+          <div id="adClubWrap" style="display:none"><label>Club</label><select id="adClub"></select></div>
           <div><label>E-Mail des neuen Admins</label><input type="email" id="naEmail" placeholder="trainer@verein.at"></div>
         </div>
         <div id="adMsg" class="msg"></div>
@@ -391,7 +408,7 @@ async function selectClub(c) {
 
   initPwDays();
   await Promise.all([loadCourts(), loadHours(), loadMembers(), loadPriceWindows(), loadBookingTypes()]);
-  loadBookings(); loadAbos(); loadStats(); loadWalletAdmin(); loadClubAdmins();
+  loadBookings(); loadAbos(); loadStats(); loadWalletAdmin(); loadClubAdmins(); loadPlans();
   refreshStripeStatus(false);
   if(isHead) loadClubsTable();
   if(params.get('stripe')==='return'){
@@ -704,15 +721,34 @@ function wireActions() {
   $('#naAdd').onclick = async () => {
     const email=$('#naEmail').value.trim();
     if(!email){ flash('#adMsg','E-Mail nötig.','error'); return; }
-    const { error } = await sb.rpc('club_admin_add',{p_club:club.id,p_email:email});
+    const { error } = await sb.rpc('club_admin_add',{p_club:adTargetClub(),p_email:email});
     if(error){ flash('#adMsg',error.message,'error'); return; }
     $('#naEmail').value=''; flash('#adMsg','Admin hinzugefügt.','ok'); loadClubAdmins();
   };
+  $('#adClub').onchange = ()=>loadClubAdmins();
+
+  $('#mplAdd').onclick = async () => {
+    const name=$('#mplName').value.trim();
+    const price=+$('#mplPrice').value;
+    const dur=Math.max(1, Math.round((+$('#mplDur').value)*(+$('#mplUnit').value)));
+    if(!name){ flash('#mplMsg','Name nötig.','error'); return; }
+    const { error } = await sb.from('membership_plans').insert({club_id:club.id, name, price, duration_days:dur, sort:0});
+    if(error){ flash('#mplMsg',error.message,'error'); return; }
+    $('#mplName').value='';$('#mplPrice').value='0';$('#mplDur').value='1';
+    flash('#mplMsg','Tarif hinzugefügt.','ok'); loadPlans();
+  };
 }
 
+function adTargetClub(){ return (isHead && $('#adClub').value) ? $('#adClub').value : club.id; }
 async function loadClubAdmins(){
   const tb=$('#adminTable tbody');
-  const { data, error } = await sb.rpc('club_admins_list',{p_club:club.id});
+  if(isHead){
+    $('#adClubWrap').style.display='block';
+    if($('#adClub').options.length!==clubs.length)
+      $('#adClub').innerHTML=clubs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    if(!$('#adClub').value) $('#adClub').value=club.id;
+  } else { $('#adClubWrap').style.display='none'; }
+  const { data, error } = await sb.rpc('club_admins_list',{p_club:adTargetClub()});
   if(error){ tb.innerHTML=`<tr><td colspan="3" class="sub">${error.message}</td></tr>`; return; }
   const rows=data||[];
   tb.innerHTML = rows.length ? rows.map(a=>`
@@ -722,9 +758,24 @@ async function loadClubAdmins(){
     : '<tr><td colspan="3" class="sub">Noch keine zusätzlichen Admins.</td></tr>';
   tb.querySelectorAll('[data-deladmin]').forEach(b=>b.onclick=async()=>{
     if(!confirm('Admin „'+b.dataset.deladmin+'" entfernen?')) return;
-    const { error:e2 } = await sb.rpc('club_admin_remove',{p_club:club.id,p_email:b.dataset.deladmin});
+    const { error:e2 } = await sb.rpc('club_admin_remove',{p_club:adTargetClub(),p_email:b.dataset.deladmin});
     if(e2){ flash('#adMsg',e2.message,'error'); return; } loadClubAdmins();
   });
+}
+
+async function loadPlans(){
+  const tb=$('#planTable tbody');
+  const { data } = await sb.from('membership_plans').select('*').eq('club_id',club.id).order('sort').order('created_at');
+  const rows=data||[];
+  const dur=n=>{ if(n%365===0) return (n/365)+' Jahr'+(n/365>1?'e':''); if(n%30===0) return (n/30)+' Monat'+(n/30>1?'e':''); return n+' Tage'; };
+  tb.innerHTML = rows.length ? rows.map(p=>`
+    <tr><td><b>${clean(p.name)}</b></td><td>${window.CB.money(p.price,club.currency)}</td><td>${dur(p.duration_days)}</td>
+      <td>${p.active?'<span class="badge ok">aktiv</span>':'<span class="badge bad">inaktiv</span>'}</td>
+      <td><button class="btn btn-ghost btn-sm" data-plantoggle="${p.id}" data-a="${p.active}">${p.active?'Deaktivieren':'Aktivieren'}</button>
+          <button class="btn btn-danger btn-sm" data-plandel="${p.id}">Löschen</button></td></tr>`).join('')
+    : '<tr><td colspan="5" class="sub">Noch keine Tarife.</td></tr>';
+  tb.querySelectorAll('[data-plantoggle]').forEach(b=>b.onclick=async()=>{ await sb.from('membership_plans').update({active:b.dataset.a!=='true'}).eq('id',b.dataset.plantoggle); loadPlans(); });
+  tb.querySelectorAll('[data-plandel]').forEach(b=>b.onclick=async()=>{ if(!confirm('Tarif löschen?'))return; await sb.from('membership_plans').delete().eq('id',b.dataset.plandel); loadPlans(); });
 }
 
 async function refreshStripeStatus(withMsg){
