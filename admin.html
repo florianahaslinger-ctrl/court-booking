@@ -39,6 +39,7 @@
       <button data-tab="guthaben">Guthaben</button>
       <button data-tab="abos">Abos</button>
       <button data-tab="zahlungen">Zahlungen</button>
+      <button data-tab="admins">Admins</button>
       <button data-tab="clubs" id="clubsTab" style="display:none">Clubs</button>
     </div>
 
@@ -270,6 +271,23 @@
       </div>
     </div>
 
+    <!-- ADMINS (mehrere Verwalter je Club) -->
+    <div class="tabpane" id="tab-admins">
+      <div class="card">
+        <h2>Club-Admins</h2>
+        <span class="sub">Weitere Personen, die diesen Club verwalten dürfen. Sie melden sich mit ihrer E-Mail unter der Login-Seite an.</span>
+        <div class="field-row" style="margin-top:10px">
+          <div><label>E-Mail des neuen Admins</label><input type="email" id="naEmail" placeholder="trainer@verein.at"></div>
+        </div>
+        <div id="adMsg" class="msg"></div>
+        <button class="btn btn-primary" id="naAdd" style="margin-top:12px">Admin hinzufügen</button>
+        <p class="hint">Der neue Admin registriert sich mit dieser E-Mail (login.html) und hat danach vollen Zugriff auf dieses Dashboard.</p>
+      </div>
+      <div class="card"><div class="table-scroll"><table class="data" id="adminTable">
+        <thead><tr><th>E-Mail</th><th>Rolle</th><th></th></tr></thead><tbody></tbody>
+      </table></div></div>
+    </div>
+
     <!-- CLUBS (nur Head-Admin) -->
     <div class="tabpane" id="tab-clubs">
       <div class="card">
@@ -373,7 +391,7 @@ async function selectClub(c) {
 
   initPwDays();
   await Promise.all([loadCourts(), loadHours(), loadMembers(), loadPriceWindows(), loadBookingTypes()]);
-  loadBookings(); loadAbos(); loadStats(); loadWalletAdmin();
+  loadBookings(); loadAbos(); loadStats(); loadWalletAdmin(); loadClubAdmins();
   refreshStripeStatus(false);
   if(isHead) loadClubsTable();
   if(params.get('stripe')==='return'){
@@ -682,6 +700,31 @@ function wireActions() {
     const opt=document.createElement('option'); opt.value=nc.id; opt.textContent=name; $('#clubPick').appendChild(opt);
     loadClubsTable();
   };
+
+  $('#naAdd').onclick = async () => {
+    const email=$('#naEmail').value.trim();
+    if(!email){ flash('#adMsg','E-Mail nötig.','error'); return; }
+    const { error } = await sb.rpc('club_admin_add',{p_club:club.id,p_email:email});
+    if(error){ flash('#adMsg',error.message,'error'); return; }
+    $('#naEmail').value=''; flash('#adMsg','Admin hinzugefügt.','ok'); loadClubAdmins();
+  };
+}
+
+async function loadClubAdmins(){
+  const tb=$('#adminTable tbody');
+  const { data, error } = await sb.rpc('club_admins_list',{p_club:club.id});
+  if(error){ tb.innerHTML=`<tr><td colspan="3" class="sub">${error.message}</td></tr>`; return; }
+  const rows=data||[];
+  tb.innerHTML = rows.length ? rows.map(a=>`
+    <tr><td>${a.email}</td>
+      <td><span class="badge ok">Club-Admin</span></td>
+      <td><button class="btn btn-danger btn-sm" data-deladmin="${a.email}">Entfernen</button></td></tr>`).join('')
+    : '<tr><td colspan="3" class="sub">Noch keine zusätzlichen Admins.</td></tr>';
+  tb.querySelectorAll('[data-deladmin]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Admin „'+b.dataset.deladmin+'" entfernen?')) return;
+    const { error:e2 } = await sb.rpc('club_admin_remove',{p_club:club.id,p_email:b.dataset.deladmin});
+    if(e2){ flash('#adMsg',e2.message,'error'); return; } loadClubAdmins();
+  });
 }
 
 async function refreshStripeStatus(withMsg){

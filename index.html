@@ -206,8 +206,10 @@ async function loadRange(){
 
   mine=[];
   if(myMember){
+    // nur die EIGENEN Buchungen (member_id) – sonst liefert RLS bei Admins ALLE Buchungen,
+    // wodurch fälschlich alles grün ("mine") würde (inkl. fremd-farbiger Sperren/Buchungsarten).
     const { data:mb }=await sb.from('bookings').select('court_id,start_at,end_at')
-      .eq('club_id',club.id).gte('start_at',start.toISOString()).lt('start_at',end.toISOString()).neq('status','cancelled');
+      .eq('club_id',club.id).eq('member_id',myMember.id).gte('start_at',start.toISOString()).lt('start_at',end.toISOString()).neq('status','cancelled');
     mine=(mb||[]).map(x=>({court_id:x.court_id,s:new Date(x.start_at).getTime(),e:new Date(x.end_at).getTime()}));
   }
   render();
