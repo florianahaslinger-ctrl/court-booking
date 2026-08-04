@@ -220,6 +220,17 @@
           <thead><tr><th>Name</th><th>Preis</th><th>Dauer</th><th>Aktiv</th><th></th></tr></thead><tbody></tbody>
         </table></div>
       </div>
+
+      <div class="card">
+        <h2>Mitgliedschaft vergeben (ohne Online-Zahlung)</h2>
+        <span class="sub">Weise einem Mitglied direkt einen Tarif zu. Die Gültigkeit wird ab heute – oder ab einem bestehenden, noch laufenden Ablauf – um die Tarif-Dauer verlängert.</span>
+        <div class="field-row" style="margin-top:10px;align-items:flex-end">
+          <div><label>Mitglied</label><select id="gmMember"></select></div>
+          <div><label>Tarif</label><select id="gmPlan"></select></div>
+          <button class="btn btn-primary" id="gmGrant">Vergeben</button>
+        </div>
+        <div id="gmMsg" class="msg"></div>
+      </div>
     </div>
 
     <!-- GUTHABEN -->
@@ -522,6 +533,7 @@ async function loadMembers() {
   const { data } = await sb.from('members').select('*').eq('club_id',club.id).order('created_at',{ascending:false});
   members = data || [];
   $('#abMember').innerHTML = members.map(m=>`<option value="${m.id}">${m.full_name||m.email}</option>`).join('');
+  $('#gmMember').innerHTML = members.map(m=>`<option value="${m.id}">${(m.full_name?m.full_name+' · ':'')+m.email}</option>`).join('');
   $('#memberTable tbody').innerHTML = members.length ? members.map(m=>`
     <tr><td>${m.full_name||'—'}</td><td>${m.email}</td>
       <td>${m.active?'<span class="badge ok">aktiv</span>':'<span class="badge bad">inaktiv</span>'}</td>
@@ -737,6 +749,15 @@ function wireActions() {
     $('#mplName').value='';$('#mplPrice').value='0';$('#mplDur').value='1';
     flash('#mplMsg','Tarif hinzugefügt.','ok'); loadPlans();
   };
+
+  $('#gmGrant').onclick = async () => {
+    const mid=$('#gmMember').value, pid=$('#gmPlan').value;
+    if(!mid||!pid){ flash('#gmMsg','Bitte Mitglied und Tarif wählen.','error'); return; }
+    const { data, error } = await sb.rpc('grant_membership',{p_member:mid,p_plan:pid});
+    if(error){ flash('#gmMsg',error.message,'error'); return; }
+    flash('#gmMsg','Vergeben – Mitgliedschaft gültig bis '+new Date(data).toLocaleDateString('de-AT')+'.','ok');
+    loadMembers(); loadStats();
+  };
 }
 
 function adTargetClub(){ return (isHead && $('#adClub').value) ? $('#adClub').value : club.id; }
@@ -768,6 +789,8 @@ async function loadPlans(){
   const { data } = await sb.from('membership_plans').select('*').eq('club_id',club.id).order('sort').order('created_at');
   const rows=data||[];
   const dur=n=>{ if(n%365===0) return (n/365)+' Jahr'+(n/365>1?'e':''); if(n%30===0) return (n/30)+' Monat'+(n/30>1?'e':''); return n+' Tage'; };
+  const act=rows.filter(p=>p.active);
+  $('#gmPlan').innerHTML = act.length ? act.map(p=>`<option value="${p.id}">${clean(p.name)} (${dur(p.duration_days)})</option>`).join('') : '<option value="">— kein Tarif —</option>';
   tb.innerHTML = rows.length ? rows.map(p=>`
     <tr><td><b>${clean(p.name)}</b></td><td>${window.CB.money(p.price,club.currency)}</td><td>${dur(p.duration_days)}</td>
       <td>${p.active?'<span class="badge ok">aktiv</span>':'<span class="badge bad">inaktiv</span>'}</td>
