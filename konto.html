@@ -14,6 +14,7 @@
   <div class="links">
     <a href="index.html">Buchen</a>
     <a href="konto.html" class="active">Mein Konto</a>
+    <a href="admin.html" id="adminLink" style="display:none">Verwaltung</a>
     <a href="#" id="logoutBtn" class="btn btn-ghost btn-sm">Abmelden</a>
   </div>
 </nav>
@@ -109,6 +110,10 @@ async function init() {
 
   $('#hello').textContent = 'Hallo, ' + email;
 
+  // Admin-Link nur zeigen, wenn diese E-Mail ein Club-/Head-Admin ist
+  const { data:adminRow } = await sb.from('app_admins').select('email').ilike('email', email).maybeSingle();
+  if (adminRow) { const a=$('#adminLink'); a.href = 'admin.html' + location.search; a.style.display=''; }
+
   // Mitglied dieses Clubs?
   const { data:m } = await sb.from('members').select('*')
     .eq('club_id', club.id).ilike('email', email).maybeSingle();
@@ -191,7 +196,11 @@ async function loadWallet() {
   $('#walletCard').style.display='block';
   const { data:bal } = await sb.rpc('wallet_get', { p_club_slug: slug });
   $('#walletBalance').textContent = window.CB.money(bal||0, club.currency);
-  const { data:led } = await sb.from('wallet_ledger').select('*').eq('club_id', club.id).order('created_at',{ascending:false}).limit(50);
+  const { data:led } = await sb.from('wallet_ledger')
+    .select('*, account:wallet_accounts!inner(email)')
+    .eq('club_id', club.id)
+    .eq('account.email', (myEmail||'').toLowerCase())
+    .order('created_at',{ascending:false}).limit(50);
   const kd = { deposit:'Aufladung', booking:'Buchung', cancel_refund:'Storno-Gutschrift', admin_credit:'Gutschrift', admin_debit:'Abbuchung' };
   $('#ledgerTable tbody').innerHTML = (led&&led.length) ? led.map(l=>{
     const amt=Number(l.amount), pos=amt>=0;

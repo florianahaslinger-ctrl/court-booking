@@ -14,6 +14,7 @@
   <div class="links">
     <a href="index.html" class="active">Buchen</a>
     <a href="konto.html">Mein Konto</a>
+    <a href="admin.html" id="adminLink" style="display:none">Verwaltung</a>
     <a href="login.html" class="btn btn-ghost btn-sm">Mitglieder-Login</a>
   </div>
 </nav>
@@ -135,6 +136,9 @@ async function init(){
   if(session?.user?.email){
     const { data:m }=await sb.from('members').select('*').eq('club_id',club.id).ilike('email',session.user.email).eq('active',true).maybeSingle();
     if(m){myMember=m;$('#memberBadge').style.display='inline-flex';$('#guestFields').style.display='none';}
+    // Admin-Link nur für Club-/Head-Admins
+    const { data:adminRow }=await sb.from('app_admins').select('email').ilike('email',session.user.email).maybeSingle();
+    if(adminRow){ const a=$('#adminLink'); a.href='admin.html'+location.search; a.style.display=''; }
   }
   // Mitglieder-Auswahl für Mitspieler (nur für eingeloggte Mitglieder/Admins befüllt; Gäste bekommen leere Liste)
   const { data:mo }=await sb.rpc('club_member_options',{p_club_slug:slug});
