@@ -58,11 +58,14 @@ window.CB = {
       default:         return round2(base); // 'full'
     }
   },
-  // Preisfaktor für ein Mitglied auf dieser Platzart. Binär (wie Tennis04):
-  // gratis-Mitglied zahlt 0, sonst voller Anteil (kein Prozent-Rabatt).
+  // Preisfaktor für ein Mitglied auf dieser Platzart:
+  // gratis=0, Rabatt=(100-d)/100, sonst voller Anteil=1. Muss zum Server
+  // (create_booking) passen, der den Anteil ebenso berechnet.
   memberFactor(club, env) {
     const r = this.rules(club, env);
-    return r.mode === 'free' ? 0 : 1;
+    if (r.mode === 'free') return 0;
+    if (r.mode === 'discount') return round2(1 - (r.disc || 0) / 100);
+    return 1;
   },
   // maximal erlaubte Buchungsdauer (min) für diese Person auf diesem Platz
   maxMinutes(club, isMember, env) {
