@@ -157,11 +157,14 @@ async function init() {
 
 async function loadBookings() {
   const tb = $('#bookTable tbody');
-  const { data, error } = await sb.from('bookings')
+  // Nur EIGENE Buchungen: Mitglieder per member_id, sonst Gastbuchungen per E-Mail.
+  // (Ohne diesen Filter sehen Admins via RLS alle Buchungen/Abos des Clubs.)
+  let q = sb.from('bookings')
     .select('*, court:courts(name,environment)')
     .eq('club_id', club.id)
-    .gte('end_at', new Date().toISOString())
-    .order('start_at');
+    .gte('end_at', new Date().toISOString());
+  q = member ? q.eq('member_id', member.id) : q.ilike('guest_email', myEmail);
+  const { data, error } = await q.order('start_at');
   if (error) { tb.innerHTML = `<tr><td colspan="7" class="sub">${error.message}</td></tr>`; return; }
   if (!data.length) { tb.innerHTML = `<tr><td colspan="7" class="sub">Keine kommenden Buchungen. <a href="index.html${location.search}" style="color:var(--brand-600);font-weight:600">Jetzt buchen →</a></td></tr>`; return; }
 
