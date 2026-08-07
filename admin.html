@@ -73,6 +73,28 @@
         <button class="btn btn-primary" id="bkAdd" style="margin-top:14px">Eintragen</button>
       </div>
       <div class="card">
+        <h2>Wiederkehrende Belegung</h2>
+        <span class="sub">Serie wie „jeden Montag 18–20 Uhr Training". Erzeugt im Zeitraum automatisch wöchentliche Buchungen – rollierend täglich im Voraus.</span>
+        <div class="field-row" style="margin-top:12px">
+          <div><label>Platz</label><select id="occCourt"></select></div>
+          <div><label>Art</label><select id="occKind"></select></div>
+          <div><label>Wochentag</label><select id="occWd"><option value="1">Mo</option><option value="2">Di</option><option value="3">Mi</option><option value="4">Do</option><option value="5">Fr</option><option value="6">Sa</option><option value="0">So</option></select></div>
+          <div><label>Von</label><input type="time" id="occFrom" value="18:00"></div>
+          <div><label>Bis</label><input type="time" id="occTo" value="20:00"></div>
+        </div>
+        <div class="field-row">
+          <div><label>Ab Datum</label><input type="date" id="occValidFrom"></div>
+          <div><label>Bis Datum</label><input type="date" id="occValidTo"></div>
+          <div style="flex:1 1 100%"><label>Notiz (optional)</label><input type="text" id="occNote" placeholder="z.B. Training, Turnier, Wartung"></div>
+        </div>
+        <div id="occMsg" class="msg"></div>
+        <button class="btn btn-primary" id="occAdd" style="margin-top:14px">Serie anlegen</button>
+      </div>
+      <div class="card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:6px"><h2 style="flex:1">Wiederkehrende Belegungen</h2></div>
+        <div class="table-scroll"><table class="data" id="occTable">
+          <thead><tr><th>Art</th><th>Slot</th><th>Platz</th><th>Zeitraum</th><th></th></tr></thead><tbody></tbody>
+        </table></div></div>
+      <div class="card">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
           <h2 style="flex:1">Buchungen</h2>
           <input type="date" id="listDate" style="width:auto">
@@ -402,6 +424,8 @@ async function selectClub(c) {
   const today = new Date().toISOString().slice(0,10);
   $('#bkDate').value = today; $('#listDate').value = today;
   $('#abFrom').value = today;
+  $('#occValidFrom').value = today;
+  $('#occValidTo').value = today.slice(0,4) + '-12-31';
 
   // Settings in Formulare
   $('#slotMin').value = club.slot_minutes;
@@ -419,7 +443,7 @@ async function selectClub(c) {
 
   initPwDays();
   await Promise.all([loadCourts(), loadHours(), loadMembers(), loadPriceWindows(), loadBookingTypes()]);
-  loadBookings(); loadAbos(); loadStats(); loadWalletAdmin(); loadClubAdmins(); loadPlans();
+  loadBookings(); loadAbos(); loadOccupancies(); loadStats(); loadWalletAdmin(); loadClubAdmins(); loadPlans();
   refreshStripeStatus(false);
   if(isHead) loadClubsTable();
   if(params.get('stripe')==='return'){
@@ -445,7 +469,7 @@ async function loadCourts() {
   const { data } = await sb.from('courts').select('*').eq('club_id',club.id).order('sort');
   courts = data || [];
   const opts = courts.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  $('#bkCourt').innerHTML = opts; $('#abCourt').innerHTML = opts;
+  $('#bkCourt').innerHTML = opts; $('#abCourt').innerHTML = opts; $('#occCourt').innerHTML = opts;
   $('#courtList').innerHTML = courts.length ? courts.map(c=>`
     <div class="field-row" style="align-items:center;border-bottom:1px solid var(--line);padding:10px 0">
       <div style="flex:2"><b>${c.name}</b></div>
@@ -483,8 +507,9 @@ const clean=s=>String(s==null?'':s).replace(/[<>&"]/g,'');
 async function loadBookingTypes(){
   const { data } = await sb.from('booking_types').select('*').eq('club_id',club.id).order('sort');
   bookingTypes = data || [];
-  $('#bkKind').innerHTML = '<option value="block">Sperre</option><option value="free">Gratis-Buchung</option>'
+  const kindOpts = '<option value="block">Sperre</option><option value="free">Gratis-Buchung</option>'
     + bookingTypes.map(t=>`<option value="type:${t.id}">${clean(t.name)}</option>`).join('');
+  $('#bkKind').innerHTML = kindOpts; $('#occKind').innerHTML = kindOpts;
   $('#btList').innerHTML = bookingTypes.length ? bookingTypes.map(t=>`
     <span class="modchip" style="border-color:${t.color}"><i style="background:${t.color}"></i>${clean(t.name)}
       <button class="x" data-delbt="${t.id}" title="Modus löschen">×</button></span>`).join('')
@@ -586,6 +611,26 @@ async function loadAbos() {
     if(!confirm('Abo löschen? Künftige Abo-Buchungen werden ebenfalls entfernt.')) return;
     await sb.from('bookings').delete().eq('subscription_id',b.dataset.delabo).gte('start_at',new Date().toISOString());
     await sb.from('subscriptions').delete().eq('id',b.dataset.delabo); loadAbos(); loadBookings(); });
+}
+
+// ---------- Wiederkehrende Belegungen ----------
+async function loadOccupancies() {
+  const { data } = await sb.from('occupancy_series')
+    .select('*, court:courts(name), type:booking_types(name,color)')
+    .eq('club_id',club.id).order('weekday');
+  const label = o => o.type ? `<span class="badge" style="border:1px solid ${o.type.color}">${clean(o.type.name)}</span>`
+                            : (o.kind==='free' ? 'Gratis-Buchung' : 'Sperre');
+  $('#occTable tbody').innerHTML = (data&&data.length)? data.map(o=>`
+    <tr><td>${label(o)}${o.note?` <span class="sub">· ${clean(o.note)}</span>`:''}</td>
+      <td>${WD[o.weekday]} ${o.start_time.slice(0,5)} · ${o.duration_minutes}′</td>
+      <td>${clean(o.court?.name||'')}</td>
+      <td>${new Date(o.valid_from).toLocaleDateString('de-AT')}–${new Date(o.valid_until).toLocaleDateString('de-AT')}</td>
+      <td><button class="btn btn-danger btn-sm" data-delocc="${o.id}">Löschen</button></td></tr>`).join('')
+    : '<tr><td colspan="5" class="sub">Keine wiederkehrenden Belegungen.</td></tr>';
+  $('#occTable').querySelectorAll('[data-delocc]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Serie löschen? Künftige Belegungs-Buchungen werden ebenfalls entfernt.')) return;
+    await sb.from('bookings').delete().eq('occupancy_id',b.dataset.delocc).gte('start_at',new Date().toISOString());
+    await sb.from('occupancy_series').delete().eq('id',b.dataset.delocc); loadOccupancies(); loadBookings(); });
 }
 
 function togglePricingFields(){
@@ -699,6 +744,26 @@ function wireActions() {
     const { data:n, error } = await sb.rpc('generate_my_subscriptions',{p_club:club.id});
     if(error){flash('#abMsg',error.message,'error');return;}
     flash('#abMsg',(n||0)+' Abo-Buchung(en) im Voraus erzeugt.','ok'); loadBookings();
+  };
+
+  $('#occAdd').onclick = async () => {
+    const from=$('#occFrom').value, to=$('#occTo').value;
+    const mm=t=>{const p=String(t||'').split(':');return (+p[0]||0)*60+(+p[1]||0);};
+    const dur=mm(to)-mm(from);
+    if(dur<=0){flash('#occMsg','Endzeit muss nach Startzeit liegen.','error');return;}
+    const vf=$('#occValidFrom').value, vt=$('#occValidTo').value;
+    if(!vf||!vt){flash('#occMsg','Bitte Zeitraum (Ab/Bis Datum) angeben.','error');return;}
+    if(vt<vf){flash('#occMsg','„Bis Datum" muss nach „Ab Datum" liegen.','error');return;}
+    const sel=$('#occKind').value; let kind='block', booking_type_id=null;
+    if(sel.startsWith('type:')){ booking_type_id=sel.slice(5); kind='block'; } else { kind=sel; }
+    const { error } = await sb.from('occupancy_series').insert({club_id:club.id, court_id:$('#occCourt').value,
+      kind, booking_type_id, weekday:+$('#occWd').value, start_time:from, duration_minutes:dur,
+      valid_from:vf, valid_until:vt, note:$('#occNote').value.trim()||null});
+    if(error){flash('#occMsg',error.message,'error');return;}
+    const { data:n, error:gerr } = await sb.rpc('generate_my_occupancies',{p_club:club.id});
+    if(gerr){flash('#occMsg','Serie angelegt, aber Erzeugen fehlgeschlagen: '+gerr.message,'error');loadOccupancies();return;}
+    $('#occNote').value='';
+    flash('#occMsg','Serie angelegt – '+(n||0)+' Buchung(en) erzeugt.','ok'); loadOccupancies(); loadBookings();
   };
 
   // Stripe Connect
