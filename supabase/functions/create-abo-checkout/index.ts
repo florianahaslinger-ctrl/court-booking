@@ -43,10 +43,10 @@ Deno.serve(async (req) => {
       const { data: s } = await admin.from("subscriptions")
         .select("id,club_id,price,price_override,payment_status,guest_email,weekday,start_time, member:members(email), court:courts(name,environment), club:clubs(slug,name,currency,stripe_enabled,stripe_account_id)")
         .eq("id", sub_id).maybeSingle();
-      if (!s) return json({ error: "Abo nicht gefunden." }, 404);
-      if (s.payment_status === "paid") return json({ error: "Dieses Abo ist bereits bezahlt." }, 409);
+      if (!s) return json({ error: "Abo nicht gefunden." }, 200);
+      if (s.payment_status === "paid") return json({ error: "Dieses Abo ist bereits bezahlt." }, 200);
       const price = s.price_override != null ? Number(s.price_override) : Number(s.price);
-      if (!(price > 0)) return json({ error: "Für dieses Abo ist keine Zahlung nötig." }, 400);
+      if (!(price > 0)) return json({ error: "Für dieses Abo ist keine Zahlung nötig." }, 200);
       club = s.club;
       cur = (club.currency || "EUR").toLowerCase();
       cents = Math.round(price * 100);
@@ -58,10 +58,10 @@ Deno.serve(async (req) => {
       const { data: b } = await admin.from("bookings")
         .select("id,price,payment_status,kind,start_at,guest_email, member:members(email), court:courts(name,environment), club:clubs(slug,name,currency,stripe_enabled,stripe_account_id)")
         .eq("id", abo_booking_id).eq("kind", "subscription").maybeSingle();
-      if (!b) return json({ error: "Termin nicht gefunden." }, 404);
-      if (b.payment_status === "paid") return json({ error: "Dieser Termin ist bereits bezahlt." }, 409);
+      if (!b) return json({ error: "Termin nicht gefunden." }, 200);
+      if (b.payment_status === "paid") return json({ error: "Dieser Termin ist bereits bezahlt." }, 200);
       const price = Number(b.price);
-      if (!(price > 0)) return json({ error: "Für diesen Termin ist keine Zahlung nötig." }, 400);
+      if (!(price > 0)) return json({ error: "Für diesen Termin ist keine Zahlung nötig." }, 200);
       club = b.club;
       cur = (club.currency || "EUR").toLowerCase();
       cents = Math.round(price * 100);

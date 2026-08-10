@@ -32,17 +32,17 @@ Deno.serve(async (req) => {
     const { data: s } = await admin.from("subscriptions")
       .select("id,club_id,price,price_override,payment_status,guest_name,guest_email,weekday,start_time,duration_minutes,valid_from,valid_until, member:members(full_name,email), court:courts(name,environment), club:clubs(slug,name,currency)")
       .eq("id", sub_id).maybeSingle();
-    if (!s) return json({ error: "Abo nicht gefunden." }, 404);
+    if (!s) return json({ error: "Abo nicht gefunden." }, 200);
 
     // Berechtigung: Aufrufer muss diesen Club verwalten (per JWT)
     const auth = req.headers.get("Authorization") ?? "";
     const asUser = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: auth } } });
     const { data: ok, error: permErr } = await asUser.rpc("manages_club", { p_club: s.club_id });
-    if (permErr || ok !== true) return json({ error: "Keine Berechtigung." }, 403);
+    if (permErr || ok !== true) return json({ error: "Keine Berechtigung." }, 200);
 
-    if (s.payment_status === "paid") return json({ error: "Dieses Abo ist bereits bezahlt." }, 409);
+    if (s.payment_status === "paid") return json({ error: "Dieses Abo ist bereits bezahlt." }, 200);
     const price = s.price_override != null ? Number(s.price_override) : Number(s.price);
-    if (!(price > 0)) return json({ error: "Für dieses Abo ist keine Zahlung nötig." }, 400);
+    if (!(price > 0)) return json({ error: "Für dieses Abo ist keine Zahlung nötig." }, 200);
 
     if (due_date) await admin.from("subscriptions").update({ due_date }).eq("id", sub_id);
 
@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     const mem = s.member as any;
     const email = (s.guest_email || mem?.email || "").toLowerCase();
     const name = s.guest_name || mem?.full_name || "";
-    if (!email) return json({ error: "Keine Empfänger-E-Mail hinterlegt." }, 400);
+    if (!email) return json({ error: "Keine Empfänger-E-Mail hinterlegt." }, 200);
 
     const WD = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
     const cur = club.currency || "EUR";
