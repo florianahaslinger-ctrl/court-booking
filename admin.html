@@ -279,6 +279,18 @@
     <!-- ABOS -->
     <div class="tabpane" id="tab-abos">
       <div class="card">
+        <h2>Abo-Zahlmodus</h2>
+        <span class="sub">Wie werden Abos bezahlt? Gilt für neue Abos dieses Clubs.</span>
+        <div class="field-row" style="margin-top:10px;align-items:flex-end">
+          <div><label>Zahlmodus</label><select id="aboPayMode">
+            <option value="series">Ganze Serie auf einmal</option>
+            <option value="weekly">Jede Woche einzeln</option>
+          </select></div>
+          <button class="btn btn-primary" id="aboPayModeSave">Speichern</button>
+        </div>
+        <div id="aboPmMsg" class="msg"></div>
+      </div>
+      <div class="card">
         <h2>Abo anlegen (fixer Slot)</h2>
         <span class="sub">Mitglied bekommt automatisch einen wiederkehrenden Wochenslot.</span>
         <div class="field-row" style="margin-top:10px">
@@ -300,7 +312,7 @@
         <p class="hint">Wiederkehrende Buchungen werden automatisch täglich im Voraus erzeugt (bis zu 1 Jahr, begrenzt durch das Abo-Enddatum). „Jetzt erzeugen" macht es sofort für den gesamten Zeitraum.</p>
       </div>
       <div class="card"><div class="table-scroll"><table class="data" id="aboTable">
-        <thead><tr><th>Mitglied</th><th>Slot</th><th>Platz</th><th>Zeitraum</th><th></th></tr></thead><tbody></tbody>
+        <thead><tr><th>Wer</th><th>Slot</th><th>Platz</th><th>Zeitraum</th><th>Preis</th><th>Status</th><th></th></tr></thead><tbody></tbody>
       </table></div></div>
     </div>
 
@@ -432,6 +444,7 @@ async function selectClub(c) {
   $('#mpModeO').value = club.member_pricing_mode_outdoor;
   $('#mpDiscO').value = club.member_discount_percent_outdoor;
   $('#mpFreeO').value = (club.member_free_max_minutes_outdoor/60);
+  $('#aboPayMode').value = club.abo_payment_mode || 'series';
   $('#mpModeI').value = club.member_pricing_mode_indoor;
   $('#mpDiscI').value = club.member_discount_percent_indoor;
   $('#mpFreeI').value = (club.member_free_max_minutes_indoor/60);
@@ -602,13 +615,30 @@ async function loadBookings() {
 async function loadAbos() {
   const { data } = await sb.from('subscriptions').select('*, court:courts(name), member:members(full_name,email)')
     .eq('club_id',club.id).order('weekday');
-  $('#aboTable tbody').innerHTML = (data&&data.length)? data.map(a=>`
-    <tr><td>${a.member?.full_name||a.member?.email||'—'}</td>
-      <td>${WD[a.weekday]} ${a.start_time.slice(0,5)} · ${a.duration_minutes}′</td>
-      <td>${a.court?.name||''}</td>
+  const who = a => a.member ? clean(a.member.full_name||a.member.email)
+                            : (clean(a.guest_name||'Gast') + (a.guest_email?` <span class="sub">(${clean(a.guest_email)})</span>`:''));
+  const statusCell = a => {
+    const paid = a.payment_status==='paid' || Number(a.price)<=0;
+    if(Number(a.price)<=0) return '<span class="badge">gratis</span>';
+    if(paid) return '<span class="badge ok">bezahlt</span>';
+    return `<span class="badge warn">offen</span>${a.due_date?`<div class="sub">fällig ${new Date(a.due_date).toLocaleDateString('de-AT')}</div>`:''}`;
+  };
+  $('#aboTable tbody').innerHTML = (data&&data.length)? data.map(a=>{
+    const paid = a.payment_status==='paid' || Number(a.price)<=0;
+    const eff = a.price_override!=null ? Number(a.price_override) : Number(a.price);
+    return `<tr><td>${who(a)}</td>
+      <td>${WD[a.weekday]} ${a.start_time.slice(0,5)} · ${a.duration_minutes}′${a.payment_mode==='weekly'?' <span class="sub">· pro Woche</span>':''}</td>
+      <td>${clean(a.court?.name||'')}</td>
       <td>${new Date(a.valid_from).toLocaleDateString('de-AT')}–${new Date(a.valid_until).toLocaleDateString('de-AT')}</td>
-      <td><button class="btn btn-danger btn-sm" data-delabo="${a.id}">Löschen</button></td></tr>`).join('')
-    : '<tr><td colspan="5" class="sub">Keine Abos.</td></tr>';
+      <td>${window.CB.money(eff,club.currency)}</td>
+      <td>${statusCell(a)}</td>
+      <td style="white-space:nowrap">${(!paid)?`<button class="btn btn-primary btn-sm" data-paidabo="${a.id}">Bezahlt</button> `:''}<button class="btn btn-danger btn-sm" data-delabo="${a.id}">Löschen</button></td></tr>`;
+  }).join('')
+    : '<tr><td colspan="7" class="sub">Keine Abos.</td></tr>';
+  $('#aboTable').querySelectorAll('[data-paidabo]').forEach(b=>b.onclick=async()=>{
+    const { error } = await sb.rpc('abo_mark_paid',{p_sub:b.dataset.paidabo});
+    if(error){flash('#abMsg',error.message,'error');return;}
+    flash('#abMsg','Als bezahlt markiert – Termine werden grün.','ok'); loadAbos(); loadBookings(); });
   $('#aboTable').querySelectorAll('[data-delabo]').forEach(b=>b.onclick=async()=>{
     if(!confirm('Abo löschen? Künftige Abo-Buchungen werden ebenfalls entfernt.')) return;
     await sb.from('bookings').delete().eq('subscription_id',b.dataset.delabo).gte('start_at',new Date().toISOString());
@@ -697,6 +727,13 @@ function wireActions() {
       return {club_id:club.id, weekday:wd, open_time:$(`[data-open="${wd}"]`).value, close_time:$(`[data-close="${wd}"]`).value, closed:$(`[data-closed="${wd}"]`).checked};});
     await sb.from('opening_hours').upsert(rows,{onConflict:'club_id,weekday'});
     flash('#prMsg','Öffnungszeiten gespeichert.','ok');
+  };
+
+  $('#aboPayModeSave').onclick = async () => {
+    const mode=$('#aboPayMode').value;
+    const { error } = await sb.from('clubs').update({abo_payment_mode:mode}).eq('id',club.id);
+    if(error){flash('#aboPmMsg',error.message,'error');return;}
+    club.abo_payment_mode=mode; flash('#aboPmMsg','Zahlmodus gespeichert.','ok');
   };
 
   $('#savePricing').onclick = async () => {
