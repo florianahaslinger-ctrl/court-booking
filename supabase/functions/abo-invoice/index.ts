@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     const price = s.price_override != null ? Number(s.price_override) : Number(s.price);
     if (!(price > 0)) return json({ error: "Für dieses Abo ist keine Zahlung nötig." }, 200);
 
-    if (due_date) await admin.from("subscriptions").update({ due_date }).eq("id", sub_id);
+    await admin.from("subscriptions").update({ invoiced_at: new Date().toISOString(), ...(due_date ? { due_date } : {}) }).eq("id", sub_id);
 
     const club = s.club as any;
     const co = s.court as any;

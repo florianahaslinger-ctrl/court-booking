@@ -7,6 +7,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/theme.css">
+<style>
+  .tabgroups{margin-bottom:22px}
+  .tabgroup{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:var(--card,#fff);overflow:hidden}
+  .tabgroup>summary{cursor:pointer;list-style:none;padding:12px 16px;font-weight:700;color:var(--ink);
+    display:flex;align-items:center;gap:8px;user-select:none}
+  .tabgroup>summary::-webkit-details-marker{display:none}
+  .tabgroup>summary::before{content:'▸';color:var(--brand-600);font-size:12px;transition:transform .15s}
+  .tabgroup[open]>summary::before{transform:rotate(90deg)}
+  .tabgroup>summary:hover{background:var(--brand-50)}
+  .tabgroup .tabs{border-bottom:none;margin:0;padding:0 12px 12px;flex-wrap:wrap}
+</style>
 </head>
 <body>
 <nav class="nav">
@@ -30,17 +41,33 @@
   <div id="app" style="display:none">
     <div class="stat-grid" id="stats"></div>
 
-    <div class="tabs">
-      <button data-tab="belegung" class="active">Belegung</button>
-      <button data-tab="platze">Plätze</button>
-      <button data-tab="zeiten">Öffnungszeiten &amp; Slot</button>
-      <button data-tab="preise">Preise &amp; Mitglieder-Regeln</button>
-      <button data-tab="mitglieder">Mitglieder</button>
-      <button data-tab="guthaben">Guthaben</button>
-      <button data-tab="abos">Abos</button>
-      <button data-tab="zahlungen">Zahlungen</button>
-      <button data-tab="admins">Admins</button>
-      <button data-tab="clubs" id="clubsTab" style="display:none">Clubs</button>
+    <div class="tabgroups">
+      <details class="tabgroup" open>
+        <summary>Laufender Betrieb</summary>
+        <div class="tabs">
+          <button data-tab="belegung" class="active">Belegung &amp; Sperren</button>
+          <button data-tab="abos">Abos</button>
+          <button data-tab="guthaben">Guthaben</button>
+        </div>
+      </details>
+      <details class="tabgroup">
+        <summary>Mitglieder &amp; Gäste</summary>
+        <div class="tabs">
+          <button data-tab="mitglieder">Mitglieder</button>
+          <button data-tab="gaeste">Gäste</button>
+        </div>
+      </details>
+      <details class="tabgroup">
+        <summary>Einmalige Einstellungen</summary>
+        <div class="tabs">
+          <button data-tab="platze">Plätze</button>
+          <button data-tab="zeiten">Öffnungszeiten &amp; Slot</button>
+          <button data-tab="preise">Preise &amp; Mitglieder-Regeln</button>
+          <button data-tab="zahlungen">Zahlungen (Stripe)</button>
+          <button data-tab="admins">Admins</button>
+          <button data-tab="clubs" id="clubsTab" style="display:none">Clubs</button>
+        </div>
+      </details>
     </div>
 
     <!-- BELEGUNG: Buchungen ansehen, sperren, gratis eintragen -->
@@ -218,6 +245,8 @@
         <div class="field-row" style="margin-top:10px">
           <div><label>E-Mail</label><input type="email" id="nmMail" placeholder="mitglied@example.com"></div>
           <div><label>Name</label><input type="text" id="nmName"></div>
+          <div><label>Telefon</label><input type="tel" id="nmPhone" placeholder="+43 …"></div>
+          <div><label>Geburtsdatum</label><input type="date" id="nmBirth"></div>
           <div><label>Gültig bis (optional)</label><input type="date" id="nmValid"></div>
         </div>
         <div id="nmMsg" class="msg"></div>
@@ -322,6 +351,17 @@
       <div class="card"><div class="table-scroll"><table class="data" id="aboTable">
         <thead><tr><th>Wer</th><th>Slot</th><th>Platz</th><th>Zeitraum</th><th>Preis</th><th>Status</th><th></th></tr></thead><tbody></tbody>
       </table></div></div>
+    </div>
+
+    <!-- GÄSTE -->
+    <div class="tabpane" id="tab-gaeste">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px"><h2 style="flex:1">Gäste-Übersicht</h2></div>
+        <span class="sub">Alle Personen, die je als Gast gebucht oder ein Abo angelegt haben – mit Kontaktdaten und Anzahl Buchungen.</span>
+        <div class="table-scroll" style="margin-top:12px"><table class="data" id="guestTable">
+          <thead><tr><th>Name</th><th>E-Mail</th><th>Telefon</th><th>Geb.</th><th>Buchungen</th><th>Zuletzt</th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
     </div>
 
     <!-- ZAHLUNGEN (Stripe Connect) -->
@@ -429,6 +469,7 @@ async function init() {
     document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
     document.querySelectorAll('.tabpane').forEach(x=>x.classList.remove('active'));
     b.classList.add('active'); $('#tab-'+b.dataset.tab).classList.add('active');
+    const d=b.closest('details.tabgroup'); if(d) d.open=true;
   }));
   wireActions();
   selectClub(isHead ? clubs.find(c=>c.id===$('#clubPick').value)||clubs[0] : clubs[0]);
@@ -464,7 +505,7 @@ async function selectClub(c) {
 
   initPwDays();
   await Promise.all([loadCourts(), loadHours(), loadMembers(), loadPriceWindows(), loadBookingTypes()]);
-  loadBookings(); loadAbos(); loadOccupancies(); loadStats(); loadWalletAdmin(); loadClubAdmins(); loadPlans(); loadMemberOverview();
+  loadBookings(); loadAbos(); loadOccupancies(); loadStats(); loadWalletAdmin(); loadClubAdmins(); loadPlans(); loadMemberOverview(); loadGuests();
   refreshStripeStatus(false);
   if(isHead) loadClubsTable();
   if(params.get('stripe')==='return'){
@@ -616,6 +657,18 @@ async function loadMemberOverview() {
   }).join('') : '<tr><td colspan="4" class="sub">Keine Mitglieder.</td></tr>';
 }
 
+// ---------- Gäste-Übersicht ----------
+async function loadGuests() {
+  const { data, error } = await sb.rpc('guest_list',{p_club:club.id});
+  if(error){ $('#guestTable tbody').innerHTML=`<tr><td colspan="6" class="sub">${clean(error.message)}</td></tr>`; return; }
+  $('#guestTable tbody').innerHTML = (data&&data.length)? data.map(g=>`
+    <tr><td>${clean(g.name)||'—'}</td><td>${clean(g.email)}</td><td>${clean(g.phone)||'—'}</td>
+      <td>${g.birthdate? new Date(g.birthdate).toLocaleDateString('de-AT'):'—'}</td>
+      <td>${g.bookings||0}</td>
+      <td>${g.last_at? new Date(g.last_at).toLocaleDateString('de-AT'):'—'}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="sub">Noch keine Gäste.</td></tr>';
+}
+
 // ---------- Buchungen ----------
 async function loadBookings() {
   const day = $('#listDate').value;
@@ -650,7 +703,9 @@ async function loadAbos() {
     const paid = a.payment_status==='paid' || Number(a.price)<=0;
     if(Number(a.price)<=0) return '<span class="badge">gratis</span>';
     if(paid) return '<span class="badge ok">bezahlt</span>';
-    return `<span class="badge warn">offen</span>${a.due_date?`<div class="sub">fällig ${new Date(a.due_date).toLocaleDateString('de-AT')}</div>`:''}`;
+    const inv = a.invoiced_at ? `<div class="sub">Rechnung gesendet · wartet auf Zahlung</div>` : '';
+    const due = a.due_date ? `<div class="sub">fällig ${new Date(a.due_date).toLocaleDateString('de-AT')}</div>` : '';
+    return `<span class="badge warn">offen</span>${inv}${due}`;
   };
   $('#aboTable tbody').innerHTML = (data&&data.length)? data.map(a=>{
     const paid = a.payment_status==='paid' || Number(a.price)<=0;
@@ -795,9 +850,11 @@ function wireActions() {
 
   $('#nmAdd').onclick = async () => {
     const email=$('#nmMail').value.trim(); if(!email){flash('#nmMsg','E-Mail nötig.','error');return;}
-    const { error } = await sb.from('members').insert({club_id:club.id, email, full_name:$('#nmName').value.trim()||null, valid_until:$('#nmValid').value||null});
+    const { error } = await sb.from('members').insert({club_id:club.id, email, full_name:$('#nmName').value.trim()||null,
+      phone:$('#nmPhone').value.trim()||null, birthdate:$('#nmBirth').value||null, valid_until:$('#nmValid').value||null});
     if(error){flash('#nmMsg',error.message,'error');return;}
-    $('#nmMail').value='';$('#nmName').value='';$('#nmValid').value=''; loadMembers(); loadStats(); flash('#nmMsg','Mitglied hinzugefügt.','ok');
+    $('#nmMail').value='';$('#nmName').value='';$('#nmPhone').value='';$('#nmBirth').value='';$('#nmValid').value='';
+    loadMembers(); loadStats(); loadMemberOverview(); flash('#nmMsg','Mitglied hinzugefügt.','ok');
   };
 
   $('#bkAdd').onclick = async () => {

@@ -67,6 +67,12 @@
       <input type="text" id="gName" placeholder="Vor- und Nachname">
       <label for="gMail">E-Mail</label>
       <input type="email" id="gMail" placeholder="du@example.com">
+      <div class="field-row">
+        <div style="flex:1"><label for="gPhone">Telefon <span class="sub" style="font-weight:400">(optional)</span></label>
+          <input type="tel" id="gPhone" placeholder="+43 …"></div>
+        <div style="flex:1"><label for="gBirth">Geburtsdatum <span class="sub" style="font-weight:400">(optional)</span></label>
+          <input type="date" id="gBirth"></div>
+      </div>
     </div>
     <div id="playersBox" style="margin-top:12px">
       <label>Mitspieler <span class="sub" style="font-weight:400">(optional, bis zu 3 · Preis pro Person)</span></label>
@@ -492,9 +498,11 @@ function recalc(){
 
 async function confirmBooking(){
   const {court,s,e}=pending, bm=$('#bookMsg');
-  let name=null,mail=null;
+  let name=null,mail=null,phone=null,birth=null;
   if(!myMember){name=$('#gName').value.trim();mail=$('#gMail').value.trim();
+    phone=$('#gPhone').value.trim()||null; birth=$('#gBirth').value||null;
     if(!name||!mail){bm.className='msg show error';bm.textContent='Bitte Name und E-Mail angeben.';return;}}
+  const saveGuest=()=>{ if(!myMember&&mail) sb.rpc('record_guest_contact',{p_club_slug:slug,p_email:mail,p_name:name,p_phone:phone,p_birthdate:birth}); };
 
   // ----- Abo (wöchentliche Serie) -----
   if(isAbo()){
@@ -509,6 +517,7 @@ async function confirmBooking(){
       p_duration_minutes:dur, p_valid_from:vf, p_valid_until:end, p_guest_name:name, p_guest_email:mail});
     $('#bookConfirm').disabled=false;
     if(error){bm.className='msg show error';bm.textContent=error.message;return;}
+    saveGuest();
     $('#bookModal').classList.remove('open');
     const tot=window.CB.money(data.price,data.currency);
     if(data.price>0 && data.payment_mode==='series'){
@@ -535,6 +544,7 @@ async function confirmBooking(){
     p_participants:participantsPayload(),p_use_credit:useCredit});
   $('#bookConfirm').disabled=false;
   if(error){bm.className='msg show error';bm.textContent=error.message;return;}
+  saveGuest();
 
   // Bezahlpflichtig -> zu Stripe weiterleiten
   if(data.price>0 && data.status==='pending'){
