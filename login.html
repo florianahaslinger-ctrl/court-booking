@@ -32,6 +32,10 @@
     <div id="nameWrap" style="display:none">
       <label for="fullName">Name</label>
       <input type="text" id="fullName" placeholder="Vor- und Nachname" autocomplete="name">
+      <label for="phone">Telefonnummer</label>
+      <input type="tel" id="phone" placeholder="+43 …" autocomplete="tel">
+      <label for="birthdate">Geburtsdatum</label>
+      <input type="date" id="birthdate" autocomplete="bday">
     </div>
 
     <div id="msg" class="msg"></div>
@@ -90,8 +94,12 @@ async function submit() {
 
   if (mode === 'signup') {
     const name = $('#fullName').value.trim();
+    const phone = $('#phone').value.trim();
+    const birthdate = $('#birthdate').value || null;
     if (!name) { msg('Bitte gib deinen Namen ein.'); $('#submitBtn').disabled = false; return; }
-    const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { full_name: name } } });
+    if (!phone) { msg('Bitte gib deine Telefonnummer ein.'); $('#submitBtn').disabled = false; return; }
+    if (!birthdate) { msg('Bitte gib dein Geburtsdatum ein.'); $('#submitBtn').disabled = false; return; }
+    const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { full_name: name, phone, birthdate } } });
     if (error) { msg(error.message); $('#submitBtn').disabled = false; return; }
     // Falls Mitglied dieser E-Mail existiert: auth_uid verknüpfen (falls RLS erlaubt)
     if (data.user) {

@@ -224,7 +224,7 @@
         <button class="btn btn-primary" id="nmAdd" style="margin-top:12px">Hinzufügen</button>
       </div>
       <div class="card"><div class="table-scroll"><table class="data" id="memberTable">
-        <thead><tr><th>Name</th><th>E-Mail</th><th>Status</th><th>Gültig bis</th><th></th></tr></thead><tbody></tbody>
+        <thead><tr><th>Name</th><th>E-Mail</th><th>Telefon</th><th>Geb.</th><th>Status</th><th>Gültig bis</th><th></th></tr></thead><tbody></tbody>
       </table></div></div>
 
       <div class="card">
@@ -560,12 +560,14 @@ async function loadMembers() {
   $('#abMember').innerHTML = members.map(m=>`<option value="${m.id}">${m.full_name||m.email}</option>`).join('');
   $('#gmMember').innerHTML = members.map(m=>`<option value="${m.id}">${(m.full_name?m.full_name+' · ':'')+m.email}</option>`).join('');
   $('#memberTable tbody').innerHTML = members.length ? members.map(m=>`
-    <tr><td>${m.full_name||'—'}</td><td>${m.email}</td>
+    <tr><td>${clean(m.full_name)||'—'}</td><td>${clean(m.email)}</td>
+      <td>${clean(m.phone)||'—'}</td>
+      <td>${m.birthdate? new Date(m.birthdate).toLocaleDateString('de-AT'):'—'}</td>
       <td>${m.active?'<span class="badge ok">aktiv</span>':'<span class="badge bad">inaktiv</span>'}</td>
       <td>${m.valid_until? new Date(m.valid_until).toLocaleDateString('de-AT'):'—'}</td>
       <td><button class="btn btn-ghost btn-sm" data-toggle="${m.id}" data-a="${m.active}">${m.active?'Deaktivieren':'Aktivieren'}</button>
           <button class="btn btn-danger btn-sm" data-delm="${m.id}">Löschen</button></td></tr>`).join('')
-    : '<tr><td colspan="5" class="sub">Noch keine Mitglieder.</td></tr>';
+    : '<tr><td colspan="7" class="sub">Noch keine Mitglieder.</td></tr>';
   $('#memberTable').querySelectorAll('[data-toggle]').forEach(b=>b.onclick=async()=>{
     await sb.from('members').update({active: b.dataset.a!=='true'}).eq('id',b.dataset.toggle); loadMembers(); loadStats(); });
   $('#memberTable').querySelectorAll('[data-delm]').forEach(b=>b.onclick=async()=>{

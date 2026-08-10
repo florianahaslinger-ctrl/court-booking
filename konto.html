@@ -114,6 +114,11 @@ async function init() {
   const { data:adminRow } = await sb.from('app_admins').select('email').ilike('email', email).maybeSingle();
   if (adminRow) { const a=$('#adminLink'); a.href = 'admin.html' + location.search; a.style.display=''; }
 
+  // Profildaten (Telefon/Geburtsdatum aus der Registrierung) in members-Zeile spiegeln
+  const meta = session.user.user_metadata || {};
+  sb.rpc('register_profile', { p_club_slug: slug, p_full_name: meta.full_name || null,
+    p_phone: meta.phone || null, p_birthdate: meta.birthdate || null });
+
   // Mitglied dieses Clubs?
   const { data:m } = await sb.from('members').select('*')
     .eq('club_id', club.id).ilike('email', email).maybeSingle();
