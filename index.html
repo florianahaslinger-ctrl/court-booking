@@ -201,8 +201,10 @@ async function init(){
     if(pid){ await sb.rpc('release_pending_booking',{p_id:pid}); sessionStorage.removeItem('cb_pending'); await loadRange(); }
     msg('Zahlung abgebrochen – die Reservierung wurde wieder freigegeben.','info');
   }
-  if(params.get('paid')||params.get('cancelled')){
-    const u=new URL(location.href); u.searchParams.delete('paid'); u.searchParams.delete('cancelled');
+  else if(params.get('abopaid')){ msg('Zahlung erfolgreich – dein Abo ist bezahlt und wird grün. Danke! 🎾','ok'); setTimeout(loadRange,1500); }
+  else if(params.get('abocancelled')){ msg('Zahlung abgebrochen. Dein Abo bleibt offen (gelb) – du kannst jederzeit erneut bezahlen.','info'); }
+  if(['paid','cancelled','abopaid','abocancelled'].some(k=>params.get(k))){
+    const u=new URL(location.href); ['paid','cancelled','abopaid','abocancelled'].forEach(k=>u.searchParams.delete(k));
     history.replaceState({},'',u);
   }
 }
@@ -508,7 +510,19 @@ async function confirmBooking(){
     $('#bookConfirm').disabled=false;
     if(error){bm.className='msg show error';bm.textContent=error.message;return;}
     $('#bookModal').classList.remove('open');
-    msg(`Abo angelegt – ${window.CB.money(data.price,data.currency)} gesamt. Erscheint gelb bis zur Zahlung.`,'ok');
+    const tot=window.CB.money(data.price,data.currency);
+    if(data.price>0 && data.payment_mode==='series'){
+      const m=$('#msg'); m.className='msg show ok';
+      m.innerHTML=`Abo angelegt – <b>${tot}</b> gesamt. <button class="btn btn-primary btn-sm" id="aboPayNow" style="margin-left:8px">Jetzt bezahlen</button> <span class="sub">oder später per Rechnung.</span>`;
+      $('#aboPayNow').onclick=async()=>{
+        $('#aboPayNow').disabled=true;
+        const {data:co,error:ce}=await sb.functions.invoke('create-abo-checkout',{body:{sub_id:data.id}});
+        if(co?.url){ location.href=co.url; return; }
+        $('#aboPayNow').disabled=false; msg((co&&co.error)||ce?.message||'Zahlung konnte nicht gestartet werden.','error');
+      };
+    } else {
+      msg(`Abo angelegt – ${tot} gesamt.${data.price>0?' Pro Woche zahlbar.':''} Erscheint gelb bis zur Zahlung.`,'ok');
+    }
     loadRange();
     return;
   }

@@ -225,12 +225,24 @@ async function loadAbo() {
     .eq('member_id', member.id).eq('active', true).order('weekday');
   if (!data || !data.length) { body.innerHTML = '<p class="sub">Aktuell kein Abo hinterlegt.</p>'; return; }
   body.innerHTML = data.map(a => {
-    const end = new Date(a.start_time + 'Z'); // nur zur Zeitformatierung
+    const free=Number(a.price)<=0, paid=a.payment_status==='paid'||free;
+    const eff=a.price_override!=null?Number(a.price_override):Number(a.price);
+    const badge = free?'<span class="badge">gratis</span>'
+                 : paid?'<span class="badge ok">bezahlt</span>'
+                 : '<span class="badge warn">offen</span>';
+    const payBtn = (!paid && a.payment_mode==='series') ? `<div style="margin-top:8px"><button class="btn btn-primary btn-sm" data-payabo="${a.id}">Jetzt bezahlen (${window.CB.money(eff,club.currency)})</button></div>` : '';
     return `<div class="card" style="box-shadow:none;border-color:var(--brand);background:var(--brand-50)">
-      <b>Jeden ${WD[a.weekday]}, ${a.start_time.slice(0,5)} Uhr</b> · ${a.duration_minutes} Min · ${a.court?.name||''}
-      <div class="sub">Gültig ${new Date(a.valid_from).toLocaleDateString('de-AT')} – ${new Date(a.valid_until).toLocaleDateString('de-AT')}</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="flex:1">Jeden ${WD[a.weekday]}, ${a.start_time.slice(0,5)} Uhr</b> ${badge}</div>
+      <div class="sub">${a.duration_minutes} Min · ${a.court?.name||''} · Gültig ${new Date(a.valid_from).toLocaleDateString('de-AT')} – ${new Date(a.valid_until).toLocaleDateString('de-AT')}${!free?` · ${window.CB.money(eff,club.currency)}`:''}${a.payment_mode==='weekly'&&!free?' · pro Woche zahlbar':''}</div>
+      ${payBtn}
     </div>`;
   }).join('');
+  body.querySelectorAll('[data-payabo]').forEach(b=>b.onclick=async()=>{
+    b.disabled=true;
+    const { data:co, error } = await sb.functions.invoke('create-abo-checkout',{ body:{ sub_id:b.dataset.payabo }});
+    if(co?.url){ location.href=co.url; return; }
+    b.disabled=false; msg((co&&co.error)||error?.message||'Zahlung konnte nicht gestartet werden.','error');
+  });
 }
 
 async function refreshMember(){

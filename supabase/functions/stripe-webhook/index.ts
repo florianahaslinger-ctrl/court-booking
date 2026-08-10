@@ -56,6 +56,19 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ received: true, membership: md.email }), { status: 200 });
     }
 
+    // Abo – ganze Serie
+    if (md.type === "abo") {
+      const { error } = await admin.rpc("abo_pay_apply", { p_sub: md.sub_id, p_session: session.id });
+      if (error) { console.error("abo apply error:", error); return new Response("abo error", { status: 500 }); }
+      return new Response(JSON.stringify({ received: true, abo: md.sub_id }), { status: 200 });
+    }
+    // Abo – einzelner Wochentermin
+    if (md.type === "abo_week") {
+      const { error } = await admin.rpc("abo_booking_pay_apply", { p_booking: md.abo_booking_id, p_session: session.id });
+      if (error) { console.error("abo_week apply error:", error); return new Response("abo_week error", { status: 500 }); }
+      return new Response(JSON.stringify({ received: true, abo_week: md.abo_booking_id }), { status: 200 });
+    }
+
     const bookingId = session.metadata?.booking_id ?? session.client_reference_id;
     if (!bookingId) return new Response("Missing booking id", { status: 400 });
 

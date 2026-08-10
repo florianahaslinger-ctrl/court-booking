@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abo bezahlen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+</head>
+<body>
+<nav class="nav">
+  <a class="logo" href="index.html"><span class="dot"></span> <span id="brandName">Court Booking</span></a>
+</nav>
+
+<div class="wrap" style="max-width:460px">
+  <div class="page-head" style="text-align:center">
+    <span class="eyebrow" style="justify-content:center">Zahlung</span>
+    <h1>Abo bezahlen</h1>
+  </div>
+  <div class="card" style="text-align:center">
+    <p id="info" class="sub">Einen Moment – wir bereiten deine Zahlung vor…</p>
+    <div id="msg" class="msg"></div>
+    <button class="btn btn-primary" id="payBtn" style="width:100%;margin-top:8px;display:none">Zur sicheren Zahlung</button>
+    <p class="hint" style="margin-top:16px"><a href="index.html" style="color:var(--brand-600);font-weight:600">Zurück zur Buchungsseite</a></p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const sb = window.cbClient();
+const params = new URLSearchParams(location.search);
+const abo = params.get('abo');
+const slug = params.get('club') || window.CB_CONFIG.DEFAULT_CLUB;
+const msg = (t, cls='error') => { const m=$('#msg'); m.className='msg show '+cls; m.textContent=t; };
+
+async function start(){
+  if(!abo){ $('#info').style.display='none'; msg('Ungültiger Zahlungslink.'); return; }
+  const { data, error } = await sb.functions.invoke('create-abo-checkout', { body:{ sub_id: abo }});
+  if(data?.url){ location.href = data.url; return; }
+  $('#info').style.display='none';
+  const e = (data&&data.error) || error?.message || 'Zahlung konnte nicht gestartet werden.';
+  msg(e, e.includes('bereits bezahlt') ? 'ok' : 'error');
+  const b=$('#payBtn'); b.style.display='inline-flex'; b.textContent='Erneut versuchen'; b.onclick=start;
+}
+(async()=>{
+  const { data:c } = await sb.from('club_public').select('name,primary_color').eq('slug',slug).maybeSingle();
+  if(c){ $('#brandName').textContent=c.name; if(c.primary_color) document.documentElement.style.setProperty('--brand',c.primary_color); }
+  start();
+})();
+</script>
+</body>
+</html>

@@ -228,6 +228,14 @@
       </table></div></div>
 
       <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px"><h2 style="flex:1">Mitglieder & Abos</h2></div>
+        <span class="sub">Alle Mitglieder mit Kontakt und ihren aktuellen Abos (grün = bezahlt, gelb = offen).</span>
+        <div class="table-scroll" style="margin-top:12px"><table class="data" id="memAboTable">
+          <thead><tr><th>Name</th><th>E-Mail</th><th>Telefon</th><th>Abos</th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
+
+      <div class="card">
         <h2>Mitgliedschafts-Tarife (Online-Zahlung)</h2>
         <span class="sub">Tarife, die Mitglieder direkt in ihrem Konto online bezahlen können – modular in Name, Preis und Dauer.</span>
         <div class="field-row" style="margin-top:10px">
@@ -456,7 +464,7 @@ async function selectClub(c) {
 
   initPwDays();
   await Promise.all([loadCourts(), loadHours(), loadMembers(), loadPriceWindows(), loadBookingTypes()]);
-  loadBookings(); loadAbos(); loadOccupancies(); loadStats(); loadWalletAdmin(); loadClubAdmins(); loadPlans();
+  loadBookings(); loadAbos(); loadOccupancies(); loadStats(); loadWalletAdmin(); loadClubAdmins(); loadPlans(); loadMemberOverview();
   refreshStripeStatus(false);
   if(isHead) loadClubsTable();
   if(params.get('stripe')==='return'){
@@ -587,6 +595,27 @@ async function loadMembers() {
     if(!confirm('Mitglied löschen?')) return; await sb.from('members').delete().eq('id',b.dataset.delm); loadMembers(); loadStats(); });
 }
 
+// ---------- Mitglieder & Abos (Übersicht) ----------
+async function loadMemberOverview() {
+  const [{data:ms},{data:subs}] = await Promise.all([
+    sb.from('members').select('id,full_name,email,phone').eq('club_id',club.id).order('full_name'),
+    sb.from('subscriptions').select('*, court:courts(name)').eq('club_id',club.id).not('member_id','is',null)
+  ]);
+  const byMember={}; (subs||[]).forEach(s=>{ (byMember[s.member_id]=byMember[s.member_id]||[]).push(s); });
+  const chip = s=>{
+    const free=Number(s.price)<=0, paid=s.payment_status==='paid'||free;
+    const eff=s.price_override!=null?Number(s.price_override):Number(s.price);
+    const col=free?'#9aa8a1':(paid?'#2E8B57':'#EAB308');
+    const st=free?'gratis':(paid?'bezahlt':'offen');
+    return `<span class="modchip" style="border-color:${col}"><i style="background:${col}"></i>${WD[s.weekday]} ${s.start_time.slice(0,5)} · ${clean(s.court?.name||'')} · ${window.CB.money(eff,club.currency)} · ${st}</span>`;
+  };
+  $('#memAboTable tbody').innerHTML = (ms&&ms.length)? ms.map(m=>{
+    const list=byMember[m.id]||[];
+    return `<tr><td>${clean(m.full_name)||'—'}</td><td>${clean(m.email)}</td><td>${clean(m.phone)||'—'}</td>
+      <td>${list.length? list.map(chip).join(' '):'<span class="sub">—</span>'}</td></tr>`;
+  }).join('') : '<tr><td colspan="4" class="sub">Keine Mitglieder.</td></tr>';
+}
+
 // ---------- Buchungen ----------
 async function loadBookings() {
   const day = $('#listDate').value;
@@ -626,15 +655,30 @@ async function loadAbos() {
   $('#aboTable tbody').innerHTML = (data&&data.length)? data.map(a=>{
     const paid = a.payment_status==='paid' || Number(a.price)<=0;
     const eff = a.price_override!=null ? Number(a.price_override) : Number(a.price);
+    const free = Number(a.price)<=0;
     return `<tr><td>${who(a)}</td>
       <td>${WD[a.weekday]} ${a.start_time.slice(0,5)} · ${a.duration_minutes}′${a.payment_mode==='weekly'?' <span class="sub">· pro Woche</span>':''}</td>
       <td>${clean(a.court?.name||'')}</td>
       <td>${new Date(a.valid_from).toLocaleDateString('de-AT')}–${new Date(a.valid_until).toLocaleDateString('de-AT')}</td>
-      <td>${window.CB.money(eff,club.currency)}</td>
+      <td>${free?window.CB.money(0,club.currency):`<input type="number" step="0.5" min="0" value="${eff}" data-priceabo="${a.id}" style="width:90px;padding:6px">`}</td>
       <td>${statusCell(a)}</td>
-      <td style="white-space:nowrap">${(!paid)?`<button class="btn btn-primary btn-sm" data-paidabo="${a.id}">Bezahlt</button> `:''}<button class="btn btn-danger btn-sm" data-delabo="${a.id}">Löschen</button></td></tr>`;
+      <td style="white-space:nowrap">${(!paid)?`<button class="btn btn-primary btn-sm" data-paidabo="${a.id}">Bezahlt</button> ${a.guest_email||a.member?`<button class="btn btn-ghost btn-sm" data-invabo="${a.id}">Rechnung</button> `:''}`:''}<button class="btn btn-danger btn-sm" data-delabo="${a.id}">Löschen</button></td></tr>`;
   }).join('')
     : '<tr><td colspan="7" class="sub">Keine Abos.</td></tr>';
+  $('#aboTable').querySelectorAll('[data-priceabo]').forEach(inp=>inp.onchange=async()=>{
+    const v=inp.value===''?null:Number(inp.value);
+    const { error } = await sb.from('subscriptions').update({price_override:v}).eq('id',inp.dataset.priceabo);
+    if(error){flash('#abMsg',error.message,'error');return;}
+    flash('#abMsg','Preis aktualisiert.','ok'); });
+  $('#aboTable').querySelectorAll('[data-invabo]').forEach(b=>b.onclick=async()=>{
+    const def=new Date(Date.now()+14*864e5).toISOString().slice(0,10);
+    const due=prompt('Zahlbar bis (Datum, JJJJ-MM-TT). Leer = ohne Zahlungsziel:', def);
+    if(due===null) return;
+    b.disabled=true;
+    const { data, error } = await sb.functions.invoke('abo-invoice',{ body:{ sub_id:b.dataset.invabo, due_date:due.trim()||null }});
+    b.disabled=false;
+    if(error||(data&&data.error)){flash('#abMsg',(data&&data.error)||error.message,'error');return;}
+    flash('#abMsg','Rechnung gesendet an '+(data.sent_to||'Kunde')+'.','ok'); loadAbos(); });
   $('#aboTable').querySelectorAll('[data-paidabo]').forEach(b=>b.onclick=async()=>{
     const { error } = await sb.rpc('abo_mark_paid',{p_sub:b.dataset.paidabo});
     if(error){flash('#abMsg',error.message,'error');return;}
@@ -643,6 +687,7 @@ async function loadAbos() {
     if(!confirm('Abo löschen? Künftige Abo-Buchungen werden ebenfalls entfernt.')) return;
     await sb.from('bookings').delete().eq('subscription_id',b.dataset.delabo).gte('start_at',new Date().toISOString());
     await sb.from('subscriptions').delete().eq('id',b.dataset.delabo); loadAbos(); loadBookings(); });
+  loadMemberOverview();
 }
 
 // ---------- Wiederkehrende Belegungen ----------
