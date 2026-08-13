@@ -83,8 +83,22 @@
       <input type="checkbox" id="aboToggle" style="width:auto;margin:0"> <span>Wöchentlich als Abo (jede Woche derselbe Slot)</span>
     </label>
     <div id="aboFields" style="display:none;margin-top:10px">
-      <label for="aboEnd">Abo läuft bis</label>
-      <input type="date" id="aboEnd">
+      <div class="field-row" style="gap:16px">
+        <label style="display:flex;align-items:center;gap:6px;margin:0;cursor:pointer;font-weight:400">
+          <input type="radio" name="aboMode" id="aboModeHours" value="hours" checked style="width:auto;margin:0"> Stundenkontingent
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;margin:0;cursor:pointer;font-weight:400">
+          <input type="radio" name="aboMode" id="aboModeDate" value="date" style="width:auto;margin:0"> Bis Enddatum
+        </label>
+      </div>
+      <div id="aboHoursBox" style="margin-top:8px">
+        <label for="aboHours">Gewünschte Stunden</label>
+        <input type="number" id="aboHours" min="1" step="1" value="50">
+      </div>
+      <div id="aboEndBox" style="display:none;margin-top:8px">
+        <label for="aboEnd">Abo läuft bis</label>
+        <input type="date" id="aboEnd">
+      </div>
       <p class="hint" style="margin-top:6px">Das Abo erscheint <b style="color:#EAB308">gelb</b> (offen) im Raster und wird <b style="color:#2E8B57">grün</b>, sobald es bezahlt ist.</p>
     </div>
     <label id="creditRow" style="display:none;align-items:center;gap:8px;margin-top:14px;cursor:pointer">
@@ -194,8 +208,11 @@ async function init(){
   $('#jump').onchange=e=>{if(e.target.value){anchor=new Date(e.target.value+'T00:00:00');loadRange();}};
   $('#bookCancel').onclick=()=>$('#bookModal').classList.remove('open');
   $('#bookConfirm').onclick=confirmBooking;
-  $('#aboToggle').onchange=recalc;
+  $('#aboToggle').onchange=()=>{syncAboMode();recalc();};
   $('#aboEnd').onchange=recalc;
+  $('#aboHours').oninput=recalc;
+  $('#aboModeHours').onchange=()=>{syncAboMode();recalc();};
+  $('#aboModeDate').onchange=()=>{syncAboMode();recalc();};
   $('#addPlayer').onclick=()=>{ if(players.length<3){players.push({sel:'guest',name:''}); renderPlayers(); recalc();} };
 
   await loadRange();
@@ -432,6 +449,8 @@ function openBooking(court,s,e){
   players=[];
   $('#useCredit').checked=false;
   $('#aboToggle').checked=false; $('#aboFields').style.display='none';
+  $('#aboModeHours').checked=true; syncAboMode();
+  if(!$('#aboHours').value){ $('#aboHours').value=50; }
   if(!$('#aboEnd').value){ const y=new Date().getFullYear(); $('#aboEnd').value=y+'-12-31'; }
   $('#playersBox').style.display='';
   renderPlayers();
@@ -449,6 +468,12 @@ function aboWeeks(sDate, endStr){
   return n;
 }
 function isAbo(){ return $('#aboToggle').checked; }
+function aboMode(){ return $('#aboModeDate').checked ? 'date' : 'hours'; }
+function syncAboMode(){
+  const m=aboMode();
+  $('#aboHoursBox').style.display = m==='hours' ? '' : 'none';
+  $('#aboEndBox').style.display   = m==='date'  ? '' : 'none';
+}
 
 function recalc(){
   const {court,s,e}=pending, minutes=(e-s)/60000, hrs=minutes/60;
@@ -471,11 +496,23 @@ function recalc(){
   $('#aboFields').style.display = abo ? 'block' : 'none';
   if(abo){
     const perSlot=Math.round(unit*(myMember?facM:1)*100)/100;   // 1 Person
-    const weeks=aboWeeks(s,$('#aboEnd').value);
+    let weeks=0, extra='';
+    if(aboMode()==='hours'){
+      const wanted=Math.max(0,parseFloat($('#aboHours').value)||0);
+      weeks = hrs>0 ? Math.ceil(wanted/hrs) : 0;
+      if(weeks>0){
+        const ed=new Date(s.getFullYear(),s.getMonth(),s.getDate());
+        ed.setDate(ed.getDate()+7*(weeks-1));
+        const bookedHrs=Math.round(weeks*hrs*100)/100;
+        extra=` (${bookedHrs} h, bis ${ed.getDate()}.${ed.getMonth()+1}.${ed.getFullYear()})`;
+      }
+    } else {
+      weeks=aboWeeks(s,$('#aboEnd').value);
+    }
     const aboTotal=Math.round(perSlot*weeks*100)/100;
     $('#bookSummary').innerHTML=
       `<b>${esc(court.name)}</b> · ${court.environment==='indoor'?'Indoor':'Outdoor'}<br>`+
-      `Jeden ${WD[s.getDay()]}, ${fmtHM(s)}–${fmtHM(e)} · ${weeks} Termin${weeks===1?'':'e'}<br>`+
+      `Jeden ${WD[s.getDay()]}, ${fmtHM(s)}–${fmtHM(e)} · ${weeks} Termin${weeks===1?'':'e'}${extra}<br>`+
       `${window.CB.money(perSlot,club.currency)}/Termin · Gesamt: <b>${window.CB.money(aboTotal,club.currency)}</b>`+
       (myMember&&rmode==='free'?' · Mitglied gratis':myMember?' · Mitglieder-Preis':'');
     $('#creditRow').style.display='none'; $('#useCredit').checked=false;
@@ -506,15 +543,23 @@ async function confirmBooking(){
 
   // ----- Abo (wöchentliche Serie) -----
   if(isAbo()){
-    const end=$('#aboEnd').value;
-    if(!end){bm.className='msg show error';bm.textContent='Bitte ein Enddatum für das Abo wählen.';return;}
     const pad=n=>String(n).padStart(2,'0');
     const vf=`${s.getFullYear()}-${pad(s.getMonth()+1)}-${pad(s.getDate())}`;
     const dur=Math.round((e-s)/60000);
-    $('#bookConfirm').disabled=true;
-    const {data,error}=await sb.rpc('create_abo',{p_club_slug:slug,p_court:court.id,
+    const args={p_club_slug:slug,p_court:court.id,
       p_weekday:s.getDay(), p_start_time:`${pad(s.getHours())}:${pad(s.getMinutes())}`,
-      p_duration_minutes:dur, p_valid_from:vf, p_valid_until:end, p_guest_name:name, p_guest_email:mail});
+      p_duration_minutes:dur, p_valid_from:vf, p_guest_name:name, p_guest_email:mail};
+    if(aboMode()==='hours'){
+      const wanted=parseFloat($('#aboHours').value);
+      if(!wanted||wanted<=0){bm.className='msg show error';bm.textContent='Bitte eine Stundenzahl größer 0 angeben.';return;}
+      args.p_total_hours=wanted;
+    } else {
+      const end=$('#aboEnd').value;
+      if(!end){bm.className='msg show error';bm.textContent='Bitte ein Enddatum für das Abo wählen.';return;}
+      args.p_valid_until=end;
+    }
+    $('#bookConfirm').disabled=true;
+    const {data,error}=await sb.rpc('create_abo',args);
     $('#bookConfirm').disabled=false;
     if(error){bm.className='msg show error';bm.textContent=error.message;return;}
     saveGuest();
