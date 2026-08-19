@@ -427,7 +427,7 @@ const params = new URLSearchParams(location.search);
 const $ = s => document.querySelector(s);
 const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 const SURF = {clay:'Sand', hard:'Hart', carpet:'Teppich', grass:'Rasen'};
-let me = null, isHead = false, club = null, clubs = [], courts = [], members = [], bookingTypes = [];
+let me = null, isHead = false, club = null, clubs = [], courts = [], members = [], bookingTypes = [], priceWindows = [];
 
 init();
 
@@ -599,7 +599,7 @@ function initPwDays(){
 function pwDaysLabel(arr){const set=new Set(arr||[]);return PW_DAYS.filter(([v])=>set.has(v)).map(([,l])=>l).join(' ')||'—';}
 async function loadPriceWindows(){
   const { data } = await sb.from('price_windows').select('*').eq('club_id',club.id).order('environment').order('start_time');
-  const rows=data||[];
+  const rows=data||[]; priceWindows=rows;
   $('#pwTable tbody').innerHTML = rows.length ? rows.map(w=>`
     <tr><td>${w.environment==='indoor'?'Indoor':'Outdoor'}</td>
       <td class="sub">${pwDaysLabel(w.weekdays)}</td>
@@ -816,7 +816,12 @@ function wireActions() {
     const from=$('#pwFrom').value, to=$('#pwTo').value;
     if(!from||!to||to<=from){flash('#pwMsg','„Bis" muss nach „Von" liegen.','error');return;}
     if($('#pwPrice').value===''||+$('#pwPrice').value<0){flash('#pwMsg','Preis ungültig.','error');return;}
-    const { error } = await sb.from('price_windows').insert({club_id:club.id, environment:$('#pwEnv').value,
+    const env=$('#pwEnv').value;
+    const clash=priceWindows.find(w=> w.environment===env
+      && (w.weekdays||[]).some(d=>days.includes(d))
+      && from < w.end_time.slice(0,5) && to > w.start_time.slice(0,5));
+    if(clash){flash('#pwMsg',`Überschneidet sich mit bestehendem Tarif ${clash.start_time.slice(0,5)}–${clash.end_time.slice(0,5)} Uhr${clash.label?' ('+String(clash.label).replace(/[<>&"]/g,'')+')':''}. Überschneidungen sind nicht erlaubt.`,'error');return;}
+    const { error } = await sb.from('price_windows').insert({club_id:club.id, environment:env,
       weekdays:days, start_time:from, end_time:to, price_per_hour:$('#pwPrice').value, label:$('#pwLabel').value.trim()||null, color:$('#pwColor').value});
     if(error){flash('#pwMsg',error.message,'error');return;}
     $('#pwLabel').value=''; flash('#pwMsg','Zeitfenster hinzugefügt.','ok'); loadPriceWindows();
