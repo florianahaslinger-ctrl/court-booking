@@ -213,6 +213,7 @@ async function init(){
   $('#aboHours').oninput=recalc;
   $('#aboModeHours').onchange=()=>{syncAboMode();recalc();};
   $('#aboModeDate').onchange=()=>{syncAboMode();recalc();};
+  $('#gBirth').onchange=recalc;   // Jugendrabatt-Vorschau bei Geburtsdatum
   $('#addPlayer').onclick=()=>{ if(players.length<3){players.push({sel:'guest',name:''}); renderPlayers(); recalc();} };
 
   await loadRange();
@@ -480,10 +481,12 @@ function recalc(){
   const rate=window.CB.rateFor(court,priceWindows,s);
   const facM=window.CB.memberFactor(club,court.environment);
   const unit=Math.round(rate*hrs*100)/100;                       // voller Platzpreis (fix)
+  const bookerBirth = myMember ? myMember.birthdate : ($('#gBirth')?.value||null);
+  const yf = window.CB.youthFactor(club, bookerBirth, s);         // Jugendrabatt (stapelt) für den Buchenden
   const parts=participantsPayload();
   const persons=1+parts.length;
   // Platzpreis geteilt durch Personenzahl, jede Person zahlt ihren Anteil nach Status
-  let sumFac=(myMember?facM:1);
+  let sumFac=(myMember?facM:1)*yf;
   parts.forEach(pp=>{ sumFac += pp.member_id ? facM : 1; });
   const total=Math.round(unit*sumFac/persons*100)/100;
   const win=priceWindows.find(w=>w.environment===court.environment&&(w.weekdays||[]).includes(s.getDay())
@@ -495,7 +498,7 @@ function recalc(){
   $('#playersBox').style.display = abo ? 'none' : '';
   $('#aboFields').style.display = abo ? 'block' : 'none';
   if(abo){
-    const perSlot=Math.round(unit*(myMember?facM:1)*100)/100;   // 1 Person
+    const perSlot=Math.round(unit*(myMember?facM:1)*yf*100)/100;   // 1 Person (inkl. Jugendrabatt)
     let weeks=0, extra='';
     if(aboMode()==='hours'){
       const wanted=Math.max(0,parseFloat($('#aboHours').value)||0);
@@ -514,7 +517,8 @@ function recalc(){
       `<b>${esc(court.name)}</b> · ${court.environment==='indoor'?'Indoor':'Outdoor'}<br>`+
       `Jeden ${WD[s.getDay()]}, ${fmtHM(s)}–${fmtHM(e)} · ${weeks} Termin${weeks===1?'':'e'}${extra}<br>`+
       `${window.CB.money(perSlot,club.currency)}/Termin · Gesamt: <b>${window.CB.money(aboTotal,club.currency)}</b>`+
-      (myMember&&rmode==='free'?' · Mitglied gratis':myMember?' · Mitglieder-Preis':'');
+      (myMember&&rmode==='free'?' · Mitglied gratis':myMember?' · Mitglieder-Preis':'')+
+      (yf<1?' · <span class="badge">Jugendrabatt</span>':'');
     $('#creditRow').style.display='none'; $('#useCredit').checked=false;
     return;
   }
@@ -523,7 +527,8 @@ function recalc(){
     `${WD[s.getDay()]} ${s.getDate()}.${s.getMonth()+1}., ${fmtHM(s)}–${fmtHM(e)}<br>`+
     `${persons} ${persons===1?'Person':'Personen'} · Platzpreis ${window.CB.money(unit,club.currency)} · Gesamt: <b>${window.CB.money(total,club.currency)}</b>`+
     (win&&win.label?` · <span class="badge">${esc(win.label)}</span>`:'')+
-    (myMember&&rmode==='free'?' · du (Mitglied) gratis':myMember?' · Mitglieder-Preis':'');
+    (myMember&&rmode==='free'?' · du (Mitglied) gratis':myMember?' · Mitglieder-Preis':'')+
+    (yf<1?' · <span class="badge">Jugendrabatt</span>':'');
   // Guthaben-Option nur für eingeloggte Mitglieder mit ausreichendem Saldo
   if(myMember && total>0 && myBalance>=total){
     $('#creditRow').style.display='flex';
@@ -548,7 +553,7 @@ async function confirmBooking(){
     const dur=Math.round((e-s)/60000);
     const args={p_club_slug:slug,p_court:court.id,
       p_weekday:s.getDay(), p_start_time:`${pad(s.getHours())}:${pad(s.getMinutes())}`,
-      p_duration_minutes:dur, p_valid_from:vf, p_guest_name:name, p_guest_email:mail};
+      p_duration_minutes:dur, p_valid_from:vf, p_guest_name:name, p_guest_email:mail, p_guest_birthdate:birth};
     if(aboMode()==='hours'){
       const wanted=parseFloat($('#aboHours').value);
       if(!wanted||wanted<=0){bm.className='msg show error';bm.textContent='Bitte eine Stundenzahl größer 0 angeben.';return;}
@@ -586,7 +591,7 @@ async function confirmBooking(){
   $('#bookConfirm').disabled=true;
   const {data,error}=await sb.rpc('create_booking',{p_club_slug:slug,p_court:court.id,
     p_start:s.toISOString(),p_end:e.toISOString(),p_guest_name:name,p_guest_email:mail,
-    p_participants:participantsPayload(),p_use_credit:useCredit});
+    p_participants:participantsPayload(),p_use_credit:useCredit,p_guest_birthdate:birth});
   $('#bookConfirm').disabled=false;
   if(error){bm.className='msg show error';bm.textContent=error.message;return;}
   saveGuest();

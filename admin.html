@@ -214,6 +214,18 @@
       </div>
 
       <div class="card">
+        <h2>Jugend-/Altersrabatt</h2>
+        <span class="sub">Optional: Personen unter einem bestimmten Alter zahlen weniger. Gilt für Gäste UND Mitglieder und wird <b>zusätzlich</b> auf den normalen Preis angewendet (stapelt).</span>
+        <div class="field-row" style="margin-top:12px;align-items:flex-end">
+          <div><label>Rabatt (%)</label><input type="number" id="ydPct" min="0" max="100" step="1" value="0"></div>
+          <div><label>gilt für Personen unter … Jahren</label><input type="number" id="ydAge" min="1" max="120" step="1" value="18"></div>
+        </div>
+        <div id="ydMsg" class="msg"></div>
+        <button class="btn btn-primary" id="saveYouth" style="margin-top:12px">Speichern</button>
+        <p class="hint">0 % = deaktiviert. Grundlage ist das Geburtsdatum (Gäste beim Buchen, Mitglieder im Profil). Bei Abos wird das Alter je Termin geprüft.</p>
+      </div>
+
+      <div class="card">
         <h2>Zeitabhängige Preise (Zeitfenster)</h2>
         <span class="sub">Optionale €/Stunde je Platzart &amp; Uhrzeit. Trifft der Slot-Beginn kein Fenster, gilt der normale Platzpreis. Bei Überschneidung gewinnt das engste Fenster.</span>
         <div class="field-row" style="margin-top:12px;align-items:flex-end">
@@ -497,6 +509,8 @@ async function selectClub(c) {
   $('#mpModeI').value = club.member_pricing_mode_indoor;
   $('#mpDiscI').value = club.member_discount_percent_indoor;
   $('#mpFreeI').value = (club.member_free_max_minutes_indoor/60);
+  $('#ydPct').value = club.youth_discount_percent ?? 0;
+  $('#ydAge').value = club.youth_max_age ?? 18;
   $('#mpCur').value = club.currency;
   $('#mpColor').value = club.primary_color || '#2E8B57';
   $('#mpOpenDays').value = club.booking_open_days;
@@ -851,6 +865,16 @@ function wireActions() {
     if(error){flash('#prMsg',error.message,'error');return;}
     Object.assign(club,upd); document.documentElement.style.setProperty('--brand',club.primary_color);
     loadStats(); flash('#prMsg','Einstellungen gespeichert.','ok');
+  };
+
+  $('#saveYouth').onclick = async () => {
+    const pct=+$('#ydPct').value, age=+$('#ydAge').value;
+    if(isNaN(pct)||pct<0||pct>100){flash('#ydMsg','Rabatt muss zwischen 0 und 100 % liegen.','error');return;}
+    if(isNaN(age)||age<1||age>120){flash('#ydMsg','Alter muss zwischen 1 und 120 Jahren liegen.','error');return;}
+    const { error } = await sb.from('clubs').update({youth_discount_percent:pct, youth_max_age:age}).eq('id',club.id);
+    if(error){flash('#ydMsg',error.message,'error');return;}
+    club.youth_discount_percent=pct; club.youth_max_age=age;
+    flash('#ydMsg', pct>0?`Gespeichert: Personen unter ${age} Jahren zahlen ${pct} % weniger.`:'Jugendrabatt deaktiviert.','ok');
   };
 
   $('#nmAdd').onclick = async () => {

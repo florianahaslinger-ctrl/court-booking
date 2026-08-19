@@ -67,6 +67,21 @@ window.CB = {
     if (r.mode === 'discount') return round2(1 - (r.disc || 0) / 100);
     return 1;
   },
+  // Jugend-/Altersrabatt-Faktor (<=1): (100-pct)/100, wenn die Person am
+  // Stichtag jünger als youth_max_age ist, sonst 1. Stapelt auf den
+  // Mitglieder-/Gastpreis. Muss zum Server (_youth_factor) passen.
+  youthFactor(club, birthdate, onDate) {
+    const pct = Number(club && club.youth_discount_percent || 0);
+    if (!birthdate || pct <= 0) return 1;
+    const maxAge = Number(club.youth_max_age || 18);
+    const on = onDate ? new Date(onDate) : new Date();
+    const b = new Date(birthdate);
+    if (isNaN(b)) return 1;
+    let age = on.getFullYear() - b.getFullYear();
+    const m = on.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && on.getDate() < b.getDate())) age--;
+    return age < maxAge ? round2(1 - pct / 100) : 1;
+  },
   // maximal erlaubte Buchungsdauer (min) für diese Person auf diesem Platz
   maxMinutes(club, isMember, env) {
     const r = this.rules(club, env);
