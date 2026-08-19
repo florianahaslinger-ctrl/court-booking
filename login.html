@@ -27,7 +27,7 @@
   <div class="card">
     <label for="email">E-Mail</label>
     <input type="email" id="email" placeholder="du@example.com" autocomplete="email">
-    <label for="pw">Passwort</label>
+    <label for="pw" id="pwLabel">Passwort</label>
     <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password">
     <div id="nameWrap" style="display:none">
       <label for="fullName">Name</label>
@@ -42,10 +42,10 @@
 
     <button class="btn btn-primary" id="submitBtn" style="width:100%;margin-top:18px">Anmelden</button>
 
-    <p class="hint" style="text-align:center;margin-top:16px">
-      <span id="toggleText">Noch kein Konto?</span>
-      <a href="#" id="toggleLink" style="color:var(--brand-600);font-weight:600">Registrieren</a>
-    </p>
+    <div style="margin-top:22px;padding-top:18px;border-top:1px solid var(--line);text-align:center">
+      <p style="margin:0 0 12px;font-size:15px;color:var(--ink-soft)"><span id="toggleText">Noch kein Konto?</span></p>
+      <button type="button" class="btn btn-ghost" id="toggleLink" style="width:100%;font-weight:600">Neues Konto erstellen</button>
+    </div>
   </div>
 </div>
 
@@ -79,8 +79,13 @@ $('#toggleLink').addEventListener('click', (e) => {
     : 'Melde dich an, um als Mitglied vergünstigt oder gratis zu buchen.';
   $('#submitBtn').textContent = signup ? 'Konto erstellen' : 'Anmelden';
   $('#nameWrap').style.display = signup ? 'block' : 'none';
+  $('#pwLabel').innerHTML = signup
+    ? 'Passwort <span style="font-weight:400;color:var(--muted)">(neues erstellen)</span>'
+    : 'Passwort';
+  $('#pw').setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
+  $('#pw').placeholder = signup ? 'Neues Passwort wählen' : '••••••••';
   $('#toggleText').textContent = signup ? 'Schon registriert?' : 'Noch kein Konto?';
-  $('#toggleLink').textContent = signup ? 'Anmelden' : 'Registrieren';
+  $('#toggleLink').textContent = signup ? 'Zur Anmeldung' : 'Neues Konto erstellen';
   $('#msg').className = 'msg';
 });
 
