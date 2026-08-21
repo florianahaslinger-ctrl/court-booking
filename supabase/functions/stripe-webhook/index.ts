@@ -40,8 +40,10 @@ Deno.serve(async (req) => {
     // Guthaben-Aufladung (Wallet) statt Buchung
     const md = session.metadata ?? {};
     if (md.type === "topup") {
+      // Gutgeschrieben wird der Bonus-Betrag (credit), falls gesetzt – sonst der gezahlte Betrag.
+      const creditEur = Number(md.credit ?? md.amount);
       const { error } = await admin.rpc("wallet_topup_apply", {
-        p_club: md.club_id, p_email: md.email, p_amount: Number(md.amount), p_session: session.id,
+        p_club: md.club_id, p_email: md.email, p_amount: creditEur, p_session: session.id,
       });
       if (error) { console.error("topup apply error:", error); return new Response("topup error", { status: 500 }); }
       return new Response(JSON.stringify({ received: true, topup: md.email }), { status: 200 });

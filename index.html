@@ -24,6 +24,8 @@
     <h1 id="clubTitle">Platz buchen</h1>
   </div>
 
+  <div id="newsBanner" style="display:none"></div>
+
   <div class="bk-toolbar">
     <div class="seg" id="viewSeg">
       <button data-view="day" class="active">Tag</button>
@@ -159,6 +161,13 @@ async function init(){
   document.title='Platz buchen – '+club.name;
   $('#brandName').textContent=club.name; $('#clubTitle').textContent=club.name;
   if(club.primary_color) document.documentElement.style.setProperty('--brand',club.primary_color);
+  // News-Banner über der Buchungsseite (falls der Club einen Text gepflegt hat)
+  if(club.news_text && club.news_text.trim()){
+    const nb=$('#newsBanner');
+    nb.style.cssText='display:block;margin-bottom:16px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:12px;padding:14px 18px';
+    nb.innerHTML='<div style="font-weight:600;color:var(--brand-600);margin-bottom:4px">📣 Aktuelles</div>'+
+      '<div style="color:var(--ink-soft)">'+esc(club.news_text).replace(/\n/g,'<br>')+'</div>';
+  }
 
   if(session?.user?.email){
     const { data:m }=await sb.from('members').select('*').eq('club_id',club.id).ilike('email',session.user.email).eq('active',true).maybeSingle();
@@ -241,7 +250,7 @@ async function loadRange(){
 
   const { data:b }=await sb.from('court_busy').select('*')
     .eq('club_id',club.id).gte('start_at',start.toISOString()).lt('start_at',end.toISOString());
-  busy=(b||[]).map(x=>({court_id:x.court_id,s:new Date(x.start_at).getTime(),e:new Date(x.end_at).getTime(),label:x.label||null,typeName:x.type_name||null,typeColor:x.type_color||null}));
+  busy=(b||[]).map(x=>({court_id:x.court_id,s:new Date(x.start_at).getTime(),e:new Date(x.end_at).getTime(),label:x.label||null,typeName:x.type_name||null,typeColor:x.type_color||null,kind:x.kind||null}));
 
   mine=[];
   if(myMember){
@@ -257,6 +266,14 @@ async function loadRange(){
 function overlaps(list,courtId,s,e){return list.some(iv=>iv.court_id===courtId&&iv.s<e&&iv.e>s);}
 function busyAt(courtId,s,e){return busy.find(iv=>iv.court_id===courtId&&iv.s<e&&iv.e>s)||null;}
 function busyLabel(courtId,s,e){const iv=busyAt(courtId,s,e);return iv&&iv.label?iv.label:null;}
+// Anzeige-Text einer belegten Zelle – club-spezifische Features (Gast-Label, Abo-Name).
+function dispLabel(iv){
+  if(!iv) return 'belegt';
+  const F=(club&&club.features)||{};
+  if(F.abo_names && iv.kind==='subscription' && iv.label) return iv.label;   // Abo: Name statt „Abo · offen"
+  if(F.guest_label && iv.kind==='guest' && !iv.label) return 'Gast';         // Gast öffentlich als „Gast"
+  return iv.typeName || iv.label || 'belegt';
+}
 function renderLegend(){
   const base='<span><i class="free"></i> frei</span><span><i class="busy"></i> belegt</span><span><i class="mine"></i> meine Buchung</span>';
   const abo='<span><i style="background:#EAB308;border-color:#EAB308"></i> Abo offen</span><span><i style="background:#2E8B57;border-color:#2E8B57"></i> Abo bezahlt</span>';
@@ -325,7 +342,7 @@ function renderDay(host){
         else attrs=` title="${esc(nm)}"`;
       } else if(st==='busy'){
         const iv=busyAt(c.id,s,e);
-        const disp=(iv&&(iv.typeName||iv.label))?(iv.typeName||iv.label):'belegt'; label=short(disp);
+        const disp=dispLabel(iv); label=short(disp);
         if(iv&&iv.typeColor) attrs=` title="${esc(disp)}" style="background:${esc(iv.typeColor)};background-image:none;color:${textOn(iv.typeColor)}"`;
         else attrs=` title="${esc(disp)}"`;
       } else if(st==='free'){
@@ -379,7 +396,7 @@ function renderWeek(host){
           else attrs=` title="${esc(nm)}"`;
         } else if(st==='busy'){
           const iv=busyAt(c.id,s,e);
-          const disp=(iv&&(iv.typeName||iv.label))?(iv.typeName||iv.label):'belegt'; label=short(disp,9);
+          const disp=dispLabel(iv); label=short(disp,9);
           if(iv&&iv.typeColor) attrs=` title="${esc(disp)}" style="background:${esc(iv.typeColor)};background-image:none;color:${textOn(iv.typeColor)}"`;
           else attrs=` title="${esc(disp)}"`;
         } else if(st==='free'){

@@ -72,6 +72,13 @@
     <!-- BELEGUNG: Buchungen ansehen, sperren, gratis eintragen -->
     <div class="tabpane" id="tab-belegung">
       <div class="card">
+        <h2>News / Hinweis über der Buchungsseite</h2>
+        <span class="sub">Erscheint als Banner ganz oben auf der Buchungsseite. Leer lassen = kein Banner.</span>
+        <textarea id="newsText" rows="4" style="width:100%;margin-top:10px" placeholder="z. B. Achtung: Platz 3 vom 1.–5. Mai gesperrt (Sanierung). Vereinsturnier am 14. Juni!"></textarea>
+        <div id="newsMsg" class="msg"></div>
+        <button class="btn btn-primary" id="newsSave" style="margin-top:10px">News speichern</button>
+      </div>
+      <div class="card">
         <h2>Buchungs-Modi (Farben &amp; Legende)</h2>
         <span class="sub">Eigene Modi wie „Training" oder „Turnier" mit Farbe – erscheinen unten als Auswahl beim Eintragen und als farbige Legende auf der Buchungsseite. „Sperre" und „Gratis-Buchung" gibt es immer.</span>
         <div class="field-row" style="margin-top:12px;align-items:flex-end">
@@ -359,9 +366,16 @@
         </div>
         <p class="hint">Wiederkehrende Buchungen werden automatisch täglich im Voraus erzeugt (bis zu 1 Jahr, begrenzt durch das Abo-Enddatum). „Jetzt erzeugen" macht es sofort für den gesamten Zeitraum.</p>
       </div>
-      <div class="card"><div class="table-scroll"><table class="data" id="aboTable">
-        <thead><tr><th>Wer</th><th>Slot</th><th>Platz</th><th>Zeitraum</th><th>Preis</th><th>Status</th><th></th></tr></thead><tbody></tbody>
-      </table></div></div>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+          <h2 style="flex:1;margin:0">Alle Abos</h2>
+          <button class="btn btn-primary btn-sm" id="abInvoiceAll" style="display:none">📧 Alle offenen Rechnungen senden</button>
+        </div>
+        <div id="abBulkMsg" class="msg"></div>
+        <div class="table-scroll"><table class="data" id="aboTable">
+          <thead><tr><th>Wer</th><th>Slot</th><th>Platz</th><th>Zeitraum</th><th>Preis</th><th>Status</th><th></th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
     </div>
 
     <!-- GÄSTE -->
@@ -423,6 +437,24 @@
         <button class="btn btn-primary" id="ncClubAdd" style="margin-top:12px">Club anlegen</button>
         <p class="hint">Buchungsseite danach: <code>index.html?club=SLUG</code>. Der Admin registriert sich mit der E-Mail (login.html) und verwaltet seinen Club.</p>
       </div>
+
+      <div class="card">
+        <h2>Features (aktueller Club)</h2>
+        <span class="sub">Sonderfunktionen pro Club aktivieren – gilt für den oben gewählten Club.</span>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftBulkInvoice" style="width:auto;margin:0"> Sammel-Button „Alle offenen Abo-Rechnungen senden"</label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftMemReminder" style="width:auto;margin:0"> Beitrags-Hinweis im Konto</label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftGuestLabel" style="width:auto;margin:0"> Gast-Buchungen im Raster als „Gast" anzeigen</label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftAboNames" style="width:auto;margin:0"> Abo-Buchungen mit Namen (statt „Abo · offen")</label>
+        </div>
+        <h3 style="font-size:14px;margin:16px 0 4px">Bonus-Aufladungen (Guthaben)</h3>
+        <span class="sub">Pro Zeile „zahlen → gutschreiben" (z. B. 90 → 100). Keine Zeile = kein Bonus.</span>
+        <div id="ftBonusRows" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
+        <button class="btn btn-ghost btn-sm" id="ftBonusAdd" style="margin-top:8px">+ Bonus-Stufe</button>
+        <div id="ftMsg" class="msg"></div>
+        <button class="btn btn-primary" id="ftSave" style="margin-top:12px">Features speichern</button>
+      </div>
+
       <div class="card"><div class="table-scroll"><table class="data" id="clubsTable">
         <thead><tr><th>Club</th><th>Slug</th><th>Admin</th><th>Plätze</th><th>Zahlungen</th><th>Aktiv</th></tr></thead><tbody></tbody>
       </table></div></div>
@@ -515,6 +547,12 @@ async function selectClub(c) {
   $('#mpOpenDays').value = club.booking_open_days;
   $('#mpCancel').value = Math.round(club.cancel_lead_minutes/60);
   togglePricingFields();
+
+  // News-Text + Features (aktueller Club)
+  $('#newsText').value = club.news_text || '';
+  renderFeatures();
+  const F = club.features || {};
+  $('#abInvoiceAll').style.display = F.bulk_abo_invoice ? '' : 'none';
 
   initPwDays();
   await Promise.all([loadCourts(), loadHours(), loadMembers(), loadPriceWindows(), loadBookingTypes()]);
@@ -787,10 +825,82 @@ function togglePricingFields(){
 }
 
 // ---------- Aktionen verdrahten ----------
+// ---------- Features (pro Club) ----------
+function renderFeatures(){
+  const F = club.features || {};
+  const set=(id,v)=>{ const el=$('#'+id); if(el) el.checked=!!v; };
+  set('ftBulkInvoice',F.bulk_abo_invoice);
+  set('ftMemReminder',F.membership_reminder);
+  set('ftGuestLabel',F.guest_label);
+  set('ftAboNames',F.abo_names);
+  const rows=$('#ftBonusRows'); if(!rows) return;
+  rows.innerHTML='';
+  const tiers=(F.topup_bonus && Array.isArray(F.topup_bonus.tiers))?F.topup_bonus.tiers:[];
+  tiers.forEach(t=>addBonusRow(t.pay,t.credit));
+}
+function addBonusRow(pay,credit){
+  const rows=$('#ftBonusRows'); if(!rows) return;
+  const div=document.createElement('div');
+  div.className='field-row'; div.style.cssText='gap:8px;align-items:center';
+  div.innerHTML=`<input type="number" class="ftPay" min="1" step="1" value="${pay!=null?pay:''}" placeholder="zahlen €" style="flex:0 0 120px">
+    <span>→</span>
+    <input type="number" class="ftCredit" min="1" step="1" value="${credit!=null?credit:''}" placeholder="Guthaben €" style="flex:0 0 130px">
+    <button type="button" class="btn btn-danger btn-sm ftDel">✕</button>`;
+  div.querySelector('.ftDel').onclick=()=>div.remove();
+  rows.appendChild(div);
+}
+function collectFeatures(){
+  const F={};
+  if($('#ftBulkInvoice').checked) F.bulk_abo_invoice=true;
+  if($('#ftMemReminder').checked) F.membership_reminder=true;
+  if($('#ftGuestLabel').checked) F.guest_label=true;
+  if($('#ftAboNames').checked) F.abo_names=true;
+  const tiers=[];
+  $('#ftBonusRows').querySelectorAll('.field-row').forEach(r=>{
+    const pay=Number(r.querySelector('.ftPay').value), credit=Number(r.querySelector('.ftCredit').value);
+    if(pay>0 && credit>0) tiers.push({pay,credit});
+  });
+  if(tiers.length) F.topup_bonus={tiers};
+  return F;
+}
+async function sendAllInvoices(){
+  if(!confirm('Rechnung an ALLE Abos mit offenem Betrag senden?')) return;
+  const btn=$('#abInvoiceAll'); btn.disabled=true; flash('#abBulkMsg','Sende Rechnungen…','info');
+  const { data:subs } = await sb.from('subscriptions').select('id,guest_email,member_id,payment_status,price')
+    .eq('club_id',club.id).eq('active',true).eq('payment_status','unpaid');
+  const list=(subs||[]).filter(s=>Number(s.price)>0 && (s.guest_email||s.member_id));
+  if(!list.length){ btn.disabled=false; flash('#abBulkMsg','Keine offenen Abo-Rechnungen zu senden.','info'); return; }
+  let ok=0, fail=0;
+  for(const s of list){
+    const { data, error } = await sb.functions.invoke('abo-invoice',{ body:{ sub_id:s.id }});
+    if(!error && !(data && data.error)) ok++; else fail++;
+  }
+  btn.disabled=false;
+  flash('#abBulkMsg',`Fertig: ${ok} Rechnung(en) gesendet${fail?`, ${fail} fehlgeschlagen`:''}.`, fail?'error':'ok');
+  loadAbos();
+}
+
 function wireActions() {
   $('#mpModeO').addEventListener('change', togglePricingFields);
   $('#mpModeI').addEventListener('change', togglePricingFields);
   $('#listDate').addEventListener('change', loadBookings);
+
+  $('#newsSave').onclick = async () => {
+    const txt=$('#newsText').value.trim()||null;
+    const { error } = await sb.from('clubs').update({news_text:txt}).eq('id',club.id);
+    if(error){flash('#newsMsg',error.message,'error');return;}
+    club.news_text=txt; flash('#newsMsg','News gespeichert.','ok');
+  };
+  $('#ftBonusAdd').onclick = ()=> addBonusRow();
+  $('#ftSave').onclick = async () => {
+    const F=collectFeatures();
+    const { error } = await sb.from('clubs').update({features:F}).eq('id',club.id);
+    if(error){flash('#ftMsg',error.message,'error');return;}
+    club.features=F;
+    $('#abInvoiceAll').style.display = F.bulk_abo_invoice ? '' : 'none';
+    flash('#ftMsg','Features gespeichert.','ok');
+  };
+  $('#abInvoiceAll').onclick = sendAllInvoices;
 
   $('#ncAdd').onclick = async () => {
     const name=$('#ncName').value.trim(); if(!name) return;

@@ -27,6 +27,8 @@
 
   <div id="msg" class="msg"></div>
 
+  <div id="memReminder" style="display:none"></div>
+
   <div class="card" id="memCard" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <h2 style="flex:1;margin:0">Meine Mitgliedschaft</h2>
@@ -52,6 +54,7 @@
       <div style="flex:0 0 170px"><label>Betrag (€)</label><input type="number" id="topupAmount" min="5" max="1000" step="5" value="20"></div>
       <button class="btn btn-primary" id="topupBtn">Guthaben aufladen</button>
     </div>
+    <div id="topupBonus" style="display:none"></div>
     <div id="walletMsg" class="msg"></div>
     <div class="table-scroll" style="margin-top:14px">
       <table class="data" id="ledgerTable">
@@ -139,15 +142,17 @@ async function init() {
   $('#memPayBtn').onclick = ()=> $('#memModal').classList.add('open');
   $('#memClose').onclick = ()=>{ $('#memModal').classList.remove('open'); sessionStorage.setItem('cb_mem_dismissed','1'); };
 
-  $('#topupBtn').onclick = async () => {
-    if(!member) return;
-    const amount=Number($('#topupAmount').value), wm=$('#walletMsg');
-    if(!(amount>=5)){wm.className='msg show error';wm.textContent='Mindestens 5 € aufladen.';return;}
-    $('#topupBtn').disabled=true; wm.className='msg show info'; wm.textContent='Weiterleitung zur Zahlung…';
-    const { data, error } = await sb.functions.invoke('create-topup',{ body:{ club_slug:slug, email:member.email, amount }});
-    if(data?.url){ location.href=data.url; return; }
-    $('#topupBtn').disabled=false; wm.className='msg show error'; wm.textContent=(data&&data.error)||error?.message||'Aufladung fehlgeschlagen.';
-  };
+  $('#topupBtn').onclick = ()=> startTopup(Number($('#topupAmount').value));
+
+  // Bonus-Aufladungen (z. B. 90 € → 100 € Guthaben) – nur wenn der Club sie konfiguriert hat.
+  const tb = club.features && club.features.topup_bonus;
+  if(member && tb && Array.isArray(tb.tiers) && tb.tiers.length){
+    const el=$('#topupBonus');
+    el.style.cssText='display:flex;gap:10px;flex-wrap:wrap;margin-top:12px';
+    el.innerHTML='<span class="sub" style="width:100%;margin-bottom:2px">Bonus-Aufladungen – mehr Guthaben fürs Geld:</span>'+
+      tb.tiers.map(t=>`<button type="button" class="btn btn-ghost btn-sm" data-topup="${t.pay}">${window.CB.money(t.pay,club.currency)} zahlen → <b style="color:var(--brand-600)">${window.CB.money(t.credit,club.currency)}</b> Guthaben</button>`).join('');
+    el.querySelectorAll('[data-topup]').forEach(b=>b.onclick=()=>startTopup(Number(b.dataset.topup)));
+  }
 
   const rp=new URLSearchParams(location.search);
   if(rp.get('topup')){ msg('Aufladung erfolgreich – dein Guthaben wird aktualisiert. 🎾','ok'); setTimeout(loadWallet,1500); }
@@ -284,7 +289,27 @@ async function loadMembership(){
     </div>`).join('') : '<p class="sub">Zurzeit keine Tarife verfügbar.</p>';
   $('#memPlans').querySelectorAll('[data-payplan]').forEach(b=>b.onclick=()=>payMembership(b.dataset.payplan));
   const needs = list.length && (!activeMem || (daysLeft!=null && daysLeft<=14));
+  // Beitrags-Hinweis im Konto (club-spezifisch aktivierbar)
+  const rem=$('#memReminder');
+  if(club.features && club.features.membership_reminder && needs){
+    const txt = !activeMem ? 'Dein Mitgliedsbeitrag ist offen.' : `Deine Mitgliedschaft läuft in ${daysLeft} Tag${daysLeft===1?'':'en'} ab.`;
+    rem.style.cssText='display:block;margin-bottom:16px;background:#fff8e6;border:1px solid #EAB308;border-left:4px solid #EAB308;border-radius:12px;padding:14px 18px';
+    rem.innerHTML='<div style="font-weight:600;color:#8a6d1b;margin-bottom:6px">⚠️ Mitgliedsbeitrag</div>'+
+      '<div style="color:var(--ink-soft);margin-bottom:10px">'+txt+' Bitte begleiche deinen Beitrag, um weiter zu vergünstigten Konditionen zu buchen.</div>'+
+      '<button type="button" class="btn btn-primary btn-sm" id="memReminderBtn">Jetzt bezahlen</button>';
+    $('#memReminderBtn').onclick=()=>$('#memModal').classList.add('open');
+  } else { rem.style.display='none'; }
   if(needs && !sessionStorage.getItem('cb_mem_dismissed')) $('#memModal').classList.add('open');
+}
+
+async function startTopup(amount){
+  if(!member) return;
+  const wm=$('#walletMsg');
+  if(!(amount>=5)){wm.className='msg show error';wm.textContent='Mindestens 5 € aufladen.';return;}
+  $('#topupBtn').disabled=true; wm.className='msg show info'; wm.textContent='Weiterleitung zur Zahlung…';
+  const { data, error } = await sb.functions.invoke('create-topup',{ body:{ club_slug:slug, email:member.email, amount }});
+  if(data?.url){ location.href=data.url; return; }
+  $('#topupBtn').disabled=false; wm.className='msg show error'; wm.textContent=(data&&data.error)||error?.message||'Aufladung fehlgeschlagen.';
 }
 
 async function payMembership(planId){
