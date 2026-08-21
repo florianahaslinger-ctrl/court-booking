@@ -22,7 +22,7 @@
 <nav class="nav">
   <a class="logo" href="admin.html"><span class="dot"></span> <span id="brandName">Club-Verwaltung</span></a>
   <div class="links">
-    <a href="index.html">Buchungsseite</a>
+    <a href="index.html" id="bookLink">Buchungsseite</a>
     <select id="clubPick" style="display:none;width:auto;padding:7px 10px"></select>
     <a href="#" id="logoutBtn" class="btn btn-ghost btn-sm">Abmelden</a>
   </div>
@@ -524,6 +524,7 @@ async function selectClub(c) {
   $('#app').style.display='block';
   $('#clubTitle').textContent = club.name;
   $('#brandName').textContent = club.name;
+  $('#bookLink').href = 'index.html?club=' + encodeURIComponent(club.slug);   // Buchungsseite des gewählten Clubs
   if (club.primary_color) document.documentElement.style.setProperty('--brand', club.primary_color);
   const today = new Date().toISOString().slice(0,10);
   $('#bkDate').value = today; $('#listDate').value = today;
