@@ -357,7 +357,15 @@
         </div>
         <div class="field-row">
           <div><label>Von</label><input type="date" id="abFrom"></div>
-          <div><label>Bis</label><input type="date" id="abTo"></div>
+          <div id="abToWrap"><label>Bis</label><input type="date" id="abTo"></div>
+        </div>
+        <div id="abManual" style="display:none">
+          <div class="field-row">
+            <div><label>Preis (€ gesamt)</label><input type="number" id="abPrice" min="0" step="0.5" value="0"></div>
+            <div><label>Laufzeit nach</label><select id="abMode"><option value="date">Enddatum</option><option value="hours">Stundenkontingent</option></select></div>
+            <div id="abHoursWrap" style="display:none"><label>Stunden</label><input type="number" id="abHours" min="1" step="1" value="50"></div>
+          </div>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400;margin-top:6px"><input type="checkbox" id="abPaid" style="width:auto;margin:0"> Sofort als bezahlt markieren (Zahlung in Persona)</label>
         </div>
         <div id="abMsg" class="msg"></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
@@ -447,6 +455,7 @@
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftGuestLabel" style="width:auto;margin:0"> Gast-Buchungen im Raster als „Gast" anzeigen</label>
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftAboNames" style="width:auto;margin:0"> Abo-Buchungen mit Namen (statt „Abo · offen")</label>
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftLegendCards" style="width:auto;margin:0"> Legende als Karten (Preise + Buchungen)</label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftManualAbo" style="width:auto;margin:0"> Abos nur über Admin (Preis + Stunden/Enddatum; kein Self-Service)</label>
         </div>
         <h3 style="font-size:14px;margin:16px 0 4px">Bonus-Aufladungen (Guthaben)</h3>
         <span class="sub">Pro Zeile „zahlen → gutschreiben" (z. B. 90 → 100). Keine Zeile = kein Bonus.</span>
@@ -555,6 +564,7 @@ async function selectClub(c) {
   renderFeatures();
   const F = club.features || {};
   $('#abInvoiceAll').style.display = F.bulk_abo_invoice ? '' : 'none';
+  syncAboForm();
 
   initPwDays();
   await Promise.all([loadCourts(), loadHours(), loadMembers(), loadPriceWindows(), loadBookingTypes()]);
@@ -827,6 +837,15 @@ function togglePricingFields(){
 }
 
 // ---------- Aktionen verdrahten ----------
+// ---------- Abo-Formular (manual_abo) ----------
+function syncAboForm(){
+  const manual=!!(club && club.features && club.features.manual_abo);
+  const mb=$('#abManual'); if(mb) mb.style.display = manual ? '' : 'none';
+  const hours = manual && $('#abMode') && $('#abMode').value==='hours';
+  const hw=$('#abHoursWrap'); if(hw) hw.style.display = hours ? '' : 'none';
+  const tw=$('#abToWrap'); if(tw) tw.style.display = hours ? 'none' : '';
+}
+
 // ---------- Features (pro Club) ----------
 function renderFeatures(){
   const F = club.features || {};
@@ -836,6 +855,7 @@ function renderFeatures(){
   set('ftGuestLabel',F.guest_label);
   set('ftAboNames',F.abo_names);
   set('ftLegendCards',F.legend_cards);
+  set('ftManualAbo',F.manual_abo);
   const rows=$('#ftBonusRows'); if(!rows) return;
   rows.innerHTML='';
   const tiers=(F.topup_bonus && Array.isArray(F.topup_bonus.tiers))?F.topup_bonus.tiers:[];
@@ -859,6 +879,7 @@ function collectFeatures(){
   if($('#ftGuestLabel').checked) F.guest_label=true;
   if($('#ftAboNames').checked) F.abo_names=true;
   if($('#ftLegendCards').checked) F.legend_cards=true;
+  if($('#ftManualAbo').checked) F.manual_abo=true;
   const tiers=[];
   $('#ftBonusRows').querySelectorAll('.field-row').forEach(r=>{
     const pay=Number(r.querySelector('.ftPay').value), credit=Number(r.querySelector('.ftCredit').value);
@@ -1013,8 +1034,35 @@ function wireActions() {
     flash('#bkMsg', what+' eingetragen.','ok'); loadBookings(); loadStats();
   };
 
+  $('#abMode').onchange = syncAboForm;
+
   $('#abAdd').onclick = async () => {
     if(!members.length){flash('#abMsg','Zuerst ein Mitglied anlegen.','error');return;}
+    // Manueller Modus (z. B. RV Wiking): Preis + Stunden/Enddatum, vom Admin eingetragen
+    if(club.features && club.features.manual_abo){
+      const mid=$('#abMember').value;
+      if(!mid){flash('#abMsg','Bitte ein Mitglied wählen.','error');return;}
+      const price=Number($('#abPrice').value);
+      if(!(price>=0)){flash('#abMsg','Bitte einen gültigen Preis angeben.','error');return;}
+      const args={p_club_slug:club.slug, p_court:$('#abCourt').value, p_weekday:+$('#abWd').value,
+        p_start_time:$('#abTime').value, p_duration_minutes:+$('#abDur').value,
+        p_member_id:mid, p_valid_from:$('#abFrom').value||null, p_price:price, p_paid:$('#abPaid').checked};
+      if($('#abMode').value==='hours'){
+        const h=Number($('#abHours').value);
+        if(!(h>0)){flash('#abMsg','Bitte eine Stundenzahl größer 0 angeben.','error');return;}
+        args.p_total_hours=h;
+      } else {
+        if(!$('#abTo').value){flash('#abMsg','Bitte ein Enddatum angeben.','error');return;}
+        args.p_valid_until=$('#abTo').value;
+      }
+      const { data, error } = await sb.rpc('admin_create_abo', args);
+      if(error){flash('#abMsg',error.message,'error');return;}
+      flash('#abMsg',`Abo angelegt – ${data.sessions} Termin(e) · ${window.CB.money(data.price,club.currency)}${data.payment_status==='paid'?' · bezahlt':''}.`,'ok');
+      $('#abPrice').value='0'; $('#abPaid').checked=false;
+      loadAbos(); loadBookings();
+      return;
+    }
+    // Standard (andere Clubs)
     const { error } = await sb.from('subscriptions').insert({club_id:club.id, member_id:$('#abMember').value, court_id:$('#abCourt').value,
       weekday:+$('#abWd').value, start_time:$('#abTime').value, duration_minutes:+$('#abDur').value,
       valid_from:$('#abFrom').value, valid_until:$('#abTo').value});

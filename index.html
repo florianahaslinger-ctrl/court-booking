@@ -169,6 +169,8 @@ async function init(){
     nb.innerHTML='<div style="font-weight:600;color:var(--brand-600);margin-bottom:4px">📣 Aktuelles</div>'+
       '<div style="color:var(--ink-soft)">'+esc(club.news_text).replace(/\n/g,'<br>')+'</div>';
   }
+  // Abo nur über Admin? Dann Self-Service-Abo ausblenden.
+  if(club.features && club.features.manual_abo){ const ar=$('#aboRow'); if(ar) ar.style.display='none'; }
 
   if(session?.user?.email){
     const { data:m }=await sb.from('members').select('*').eq('club_id',club.id).ilike('email',session.user.email).eq('active',true).maybeSingle();
