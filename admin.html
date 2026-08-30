@@ -446,6 +446,7 @@
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftMemReminder" style="width:auto;margin:0"> Beitrags-Hinweis im Konto</label>
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftGuestLabel" style="width:auto;margin:0"> Gast-Buchungen im Raster als „Gast" anzeigen</label>
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftAboNames" style="width:auto;margin:0"> Abo-Buchungen mit Namen (statt „Abo · offen")</label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftLegendCards" style="width:auto;margin:0"> Legende als Karten (Preise + Buchungen)</label>
         </div>
         <h3 style="font-size:14px;margin:16px 0 4px">Bonus-Aufladungen (Guthaben)</h3>
         <span class="sub">Pro Zeile „zahlen → gutschreiben" (z. B. 90 → 100). Keine Zeile = kein Bonus.</span>
@@ -834,6 +835,7 @@ function renderFeatures(){
   set('ftMemReminder',F.membership_reminder);
   set('ftGuestLabel',F.guest_label);
   set('ftAboNames',F.abo_names);
+  set('ftLegendCards',F.legend_cards);
   const rows=$('#ftBonusRows'); if(!rows) return;
   rows.innerHTML='';
   const tiers=(F.topup_bonus && Array.isArray(F.topup_bonus.tiers))?F.topup_bonus.tiers:[];
@@ -856,6 +858,7 @@ function collectFeatures(){
   if($('#ftMemReminder').checked) F.membership_reminder=true;
   if($('#ftGuestLabel').checked) F.guest_label=true;
   if($('#ftAboNames').checked) F.abo_names=true;
+  if($('#ftLegendCards').checked) F.legend_cards=true;
   const tiers=[];
   $('#ftBonusRows').querySelectorAll('.field-row').forEach(r=>{
     const pay=Number(r.querySelector('.ftPay').value), credit=Number(r.querySelector('.ftCredit').value);
