@@ -350,6 +350,8 @@ function renderLegendCards(){
       </div></div>`;
   host.innerHTML=priceCard+bookCard;
   host.style.display='grid';
+  // Legende unter das Buchungsraster verschieben
+  const gh=$('#gridHost'); if(gh && gh.nextElementSibling!==host) gh.after(host);
 }
 function cellStatus(courtId,s,e){
   const now=Date.now();
