@@ -317,14 +317,16 @@ function renderLegendCards(){
   const youthPct=Number(club.youth_discount_percent||0);
   const jf = youthPct>0 ? (1-youthPct/100) : null;
   const envName=e=>e==='indoor'?'Indoor':'Outdoor';
-  // Preis-Quellen: Tarif-Fenster, sonst Basis-Platzpreise je Umgebung
+  // Preis-Quellen: Tarif-Fenster, sonst Basis-Platzpreise – nur die aktuelle Ansicht (Indoor/Outdoor)
+  const envOk=e=> envFilter==='all' || e===envFilter;
   let blocks=[];
-  if(priceWindows.length){
-    blocks=priceWindows.slice().sort((a,b)=>a.environment.localeCompare(b.environment)).map(w=>({
+  const wins=priceWindows.filter(w=>envOk(w.environment));
+  if(wins.length){
+    blocks=wins.slice().sort((a,b)=>a.environment.localeCompare(b.environment)).map(w=>({
       title: w.label || `${envName(w.environment)} ${w.start_time.slice(0,5)}–${w.end_time.slice(0,5)}`,
       env: w.environment, color: w.color||null, price: Number(w.price_per_hour) }));
   } else {
-    const seen={}; courts.forEach(c=>{ if(!(c.environment in seen)) seen[c.environment]=Number(c.price_per_hour); });
+    const seen={}; courts.filter(c=>envOk(c.environment)).forEach(c=>{ if(!(c.environment in seen)) seen[c.environment]=Number(c.price_per_hour); });
     blocks=Object.keys(seen).map(env=>({title:envName(env), env, color:null, price:seen[env]}));
   }
   const row=(label,val,color)=>`<div style="display:flex;align-items:center;gap:10px;padding:5px 0">
@@ -364,6 +366,7 @@ function cellStatus(courtId,s,e){
 function render(){
   const host=$('#gridHost'); host.innerHTML='';
   if(view==='week') renderWeek(host); else renderDay(host);
+  if(club && club.features && club.features.legend_cards) renderLegendCards();  // Legende folgt Indoor/Outdoor
 }
 
 function renderDay(host){
