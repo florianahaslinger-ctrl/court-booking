@@ -31,7 +31,9 @@ Deno.serve(async (req) => {
     const { data: plan } = await admin.from("membership_plans")
       .select("id,name,price,duration_days,active,club_id").eq("id", plan_id).maybeSingle();
     if (!plan || !plan.active || plan.club_id !== club.id) return json({ error: "Tarif nicht verfügbar." }, 404);
-    if (Number(plan.price) <= 0) return json({ error: "Dieser Tarif ist kostenlos – keine Zahlung nötig." }, 400);
+    if (Number(plan.price) <= 0) return json({ error: "Dieser Tarif ist kostenlos – keine Zahlung nötig." }, 200);
+    if (!(club.stripe_enabled && club.stripe_account_id))
+      return json({ error: "Dieser Club hat Online-Zahlungen noch nicht eingerichtet." }, 200);
 
     const cur = (club.currency || "EUR").toLowerCase();
     const cents = Math.round(Number(plan.price) * 100);
@@ -70,11 +72,11 @@ Deno.serve(async (req) => {
     const session = await resp.json();
     if (!resp.ok) {
       console.error("Stripe error:", session);
-      return json({ error: "Zahlung konnte nicht gestartet werden: " + (session?.error?.message ?? resp.status) }, 502);
+      return json({ error: "Zahlung konnte nicht gestartet werden: " + (session?.error?.message ?? resp.status) }, 200);
     }
     return json({ url: session.url });
   } catch (e) {
     console.error(e);
-    return json({ error: "Interner Fehler: " + (e as Error).message }, 500);
+    return json({ error: "Interner Fehler: " + (e as Error).message }, 200);
   }
 });

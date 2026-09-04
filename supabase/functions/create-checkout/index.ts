@@ -43,6 +43,8 @@ Deno.serve(async (req) => {
     const club = b.club as unknown as {
       slug: string; name: string; currency: string; stripe_enabled: boolean; stripe_account_id: string | null;
     };
+    if (!(club.stripe_enabled && club.stripe_account_id))
+      return json({ error: "Dieser Club hat Online-Zahlungen noch nicht eingerichtet." }, 200);
     const cur = (club.currency || "EUR").toLowerCase();
     const cents = Math.round(Number(b.price) * 100);
     const start = new Date(b.start_at);
@@ -85,12 +87,12 @@ Deno.serve(async (req) => {
     const session = await resp.json();
     if (!resp.ok) {
       console.error("Stripe error:", session);
-      return json({ error: "Zahlung konnte nicht gestartet werden: " + (session?.error?.message ?? resp.status) }, 502);
+      return json({ error: "Zahlung konnte nicht gestartet werden: " + (session?.error?.message ?? resp.status) }, 200);
     }
     await admin.from("bookings").update({ stripe_session_id: session.id }).eq("id", b.id);
     return json({ url: session.url });
   } catch (e) {
     console.error(e);
-    return json({ error: "Interner Fehler: " + (e as Error).message }, 500);
+    return json({ error: "Interner Fehler: " + (e as Error).message }, 200);
   }
 });

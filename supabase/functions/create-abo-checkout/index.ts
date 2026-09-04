@@ -72,6 +72,9 @@ Deno.serve(async (req) => {
       metaExtra = `&metadata[type]=abo_week&metadata[abo_booking_id]=${b.id}`;
     }
 
+    if (!(club.stripe_enabled && club.stripe_account_id))
+      return json({ error: "Dieser Club hat Online-Zahlungen noch nicht eingerichtet." }, 200);
+
     const ret = `${SITE_URL}/index.html?club=${encodeURIComponent(club.slug)}`;
     const body =
       `mode=payment` +
@@ -94,11 +97,11 @@ Deno.serve(async (req) => {
     const session = await resp.json();
     if (!resp.ok) {
       console.error("Stripe error:", session);
-      return json({ error: "Zahlung konnte nicht gestartet werden: " + (session?.error?.message ?? resp.status) }, 502);
+      return json({ error: "Zahlung konnte nicht gestartet werden: " + (session?.error?.message ?? resp.status) }, 200);
     }
     return json({ url: session.url });
   } catch (e) {
     console.error(e);
-    return json({ error: "Interner Fehler: " + (e as Error).message }, 500);
+    return json({ error: "Interner Fehler: " + (e as Error).message }, 200);
   }
 });
