@@ -50,11 +50,12 @@
       <div style="font-size:24px;font-weight:700;color:var(--brand-600)" id="walletBalance">—</div>
     </div>
     <span class="sub">Lade Guthaben auf und bezahle Buchungen bequem damit. Stornos werden als Guthaben gutgeschrieben.</span>
-    <div class="field-row" style="margin-top:12px;align-items:flex-end">
+    <div class="field-row" id="topupControls" style="margin-top:12px;align-items:flex-end">
       <div style="flex:0 0 170px"><label>Betrag (€)</label><input type="number" id="topupAmount" min="5" max="1000" step="5" value="20"></div>
       <button class="btn btn-primary" id="topupBtn">Guthaben aufladen</button>
     </div>
     <div id="topupBonus" style="display:none"></div>
+    <p id="topupNoStripe" class="hint" style="display:none;margin-top:10px">Online-Aufladung ist für diesen Club noch nicht aktiv.</p>
     <div id="walletMsg" class="msg"></div>
     <div class="table-scroll" style="margin-top:14px">
       <table class="data" id="ledgerTable">
@@ -144,8 +145,14 @@ async function init() {
 
   $('#topupBtn').onclick = ()=> startTopup(Number($('#topupAmount').value));
 
+  // Ohne eingerichtetes Stripe kann nicht aufgeladen werden -> Steuerung ausblenden.
+  if(!club.stripe_enabled){
+    $('#topupControls').style.display='none';
+    $('#topupBonus').style.display='none';
+    $('#topupNoStripe').style.display='block';
+  }
   // Bonus-Aufladungen (z. B. 90 € → 100 € Guthaben) – nur wenn der Club sie konfiguriert hat.
-  const tb = club.features && club.features.topup_bonus;
+  const tb = club.stripe_enabled && club.features && club.features.topup_bonus;
   if(member && tb && Array.isArray(tb.tiers) && tb.tiers.length){
     const el=$('#topupBonus');
     el.style.cssText='display:flex;gap:10px;flex-wrap:wrap;margin-top:12px';

@@ -25,15 +25,16 @@ Deno.serve(async (req) => {
     const { club_slug, email, amount } = await req.json() as { club_slug?: string; email?: string; amount?: number };
     const mail = (email ?? "").trim().toLowerCase();
     const eur = Number(amount);
-    if (!club_slug || !mail || !mail.includes("@")) return json({ error: "Club und gültige E-Mail nötig." }, 400);
-    if (!(eur >= 5) || eur > 1000) return json({ error: "Betrag zwischen 5 und 1000 € angeben." }, 400);
+    // Fachliche Fehler als HTTP 200 mit {error}, damit im UI der echte Grund statt „non-2xx" erscheint.
+    if (!club_slug || !mail || !mail.includes("@")) return json({ error: "Club und gültige E-Mail nötig." }, 200);
+    if (!(eur >= 5) || eur > 1000) return json({ error: "Betrag zwischen 5 und 1000 € angeben." }, 200);
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: club } = await admin.from("clubs")
       .select("id,slug,name,currency,stripe_enabled,stripe_account_id,features").eq("slug", club_slug).maybeSingle();
-    if (!club) return json({ error: "Club nicht gefunden." }, 404);
+    if (!club) return json({ error: "Club nicht gefunden." }, 200);
     if (!club.stripe_enabled || !club.stripe_account_id)
-      return json({ error: "Dieser Club hat Online-Zahlungen noch nicht eingerichtet." }, 400);
+      return json({ error: "Dieser Club hat Online-Zahlungen noch nicht eingerichtet." }, 200);
 
     // Bonus-Aufladung: Wenn der gezahlte Betrag exakt einer konfigurierten Stufe entspricht,
     // wird ein höherer Guthaben-Betrag gutgeschrieben (z. B. 90 € zahlen → 100 € Guthaben).
@@ -78,11 +79,11 @@ Deno.serve(async (req) => {
     const session = await resp.json();
     if (!resp.ok) {
       console.error("Stripe error:", session);
-      return json({ error: "Aufladung konnte nicht gestartet werden: " + (session?.error?.message ?? resp.status) }, 502);
+      return json({ error: "Aufladung konnte nicht gestartet werden: " + (session?.error?.message ?? resp.status) }, 200);
     }
     return json({ url: session.url });
   } catch (e) {
     console.error(e);
-    return json({ error: "Interner Fehler: " + (e as Error).message }, 500);
+    return json({ error: "Interner Fehler: " + (e as Error).message }, 200);
   }
 });
