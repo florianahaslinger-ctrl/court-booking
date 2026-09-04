@@ -264,9 +264,11 @@ async function loadRange(){
   if(myMember){
     // nur die EIGENEN Buchungen (member_id) – sonst liefert RLS bei Admins ALLE Buchungen,
     // wodurch fälschlich alles grün ("mine") würde (inkl. fremd-farbiger Sperren/Buchungsarten).
-    const { data:mb }=await sb.from('bookings').select('court_id,start_at,end_at')
+    const { data:mb }=await sb.from('bookings').select('court_id,start_at,end_at,kind')
       .eq('club_id',club.id).eq('member_id',myMember.id).gte('start_at',start.toISOString()).lt('start_at',end.toISOString()).neq('status','cancelled');
-    mine=(mb||[]).map(x=>({court_id:x.court_id,s:new Date(x.start_at).getTime(),e:new Date(x.end_at).getTime()}));
+    const plainAbo = !!(club.features && club.features.abo_plain);
+    // Bei abo_plain: eigene Abo-Termine NICHT als „meine" (grün) führen, damit sie – wie alle Abos – blau erscheinen.
+    mine=(mb||[]).filter(x=>!(plainAbo && x.kind==='subscription')).map(x=>({court_id:x.court_id,s:new Date(x.start_at).getTime(),e:new Date(x.end_at).getTime()}));
   }
   render();
 }
@@ -278,13 +280,23 @@ function busyLabel(courtId,s,e){const iv=busyAt(courtId,s,e);return iv&&iv.label
 function dispLabel(iv){
   if(!iv) return 'belegt';
   const F=(club&&club.features)||{};
+  if(F.abo_plain && iv.kind==='subscription') return iv.label || 'Abo';       // Abo: nur „Abo"/Name, kein offen/bezahlt
   if(F.abo_names && iv.kind==='subscription' && iv.label) return iv.label;   // Abo: Name statt „Abo · offen"
   if(F.guest_label && iv.kind==='guest' && !iv.label) return 'Gast';         // Gast öffentlich als „Gast"
   return iv.typeName || iv.label || 'belegt';
 }
+// Zellenfarbe – bei abo_plain sind Abos einheitlich blau (kein offen/bezahlt).
+function dispColor(iv){
+  if(!iv) return null;
+  const F=(club&&club.features)||{};
+  if(F.abo_plain && iv.kind==='subscription') return '#3B7DD8';
+  return iv.typeColor || null;
+}
 function renderLegend(){
   const base='<span><i class="free"></i> frei</span><span><i class="busy"></i> belegt</span><span><i class="mine"></i> meine Buchung</span>';
-  const abo='<span><i style="background:#EAB308;border-color:#EAB308"></i> Abo offen</span><span><i style="background:#2E8B57;border-color:#2E8B57"></i> Abo bezahlt</span>';
+  const abo=(club.features&&club.features.abo_plain)
+    ? '<span><i style="background:#3B7DD8;border-color:#3B7DD8"></i> Abo</span>'
+    : '<span><i style="background:#EAB308;border-color:#EAB308"></i> Abo offen</span><span><i style="background:#2E8B57;border-color:#2E8B57"></i> Abo bezahlt</span>';
   const types=bookingTypes.map(t=>`<span><i style="background:${esc(t.color)};border-color:${esc(t.color)}"></i> ${esc(t.name)}</span>`).join('');
   $('#legend').innerHTML=base+abo+types;
 }
@@ -343,13 +355,16 @@ function renderLegendCards(){
       </div>`).join('')+
     `<div class="sub" style="text-align:right;border-top:1px solid var(--line);padding-top:8px;margin-top:2px">Preise pro Stunde in €</div></div>`;
   const types=bookingTypes.map(t=>`<span><i style="background:${esc(t.color)};border-color:${esc(t.color)}"></i> ${esc(t.name)}</span>`).join('');
+  const plainAbo = !!(club.features && club.features.abo_plain);
+  const aboLegend = plainAbo
+    ? '<span><i style="background:#3B7DD8;border-color:#3B7DD8"></i> Abo</span>'
+    : '<span><i style="background:#EAB308;border-color:#EAB308"></i> Abo offen</span><span><i style="background:#2E8B57;border-color:#2E8B57"></i> Abo bezahlt</span>';
   const bookCard = `<div class="card"><h3 style="margin:0 0 12px;font-size:16px">Legende für Buchungen</h3>
       <div class="bk-legend" style="margin:0">
         <span><i class="free"></i> frei</span>
         <span><i class="busy"></i> Einzelstunde / belegt</span>
         <span><i class="mine"></i> meine Buchung</span>
-        <span><i style="background:#EAB308;border-color:#EAB308"></i> Abo offen</span>
-        <span><i style="background:#2E8B57;border-color:#2E8B57"></i> Abo bezahlt</span>
+        ${aboLegend}
         ${types}
       </div></div>`;
   host.innerHTML=priceCard+bookCard;
@@ -396,8 +411,8 @@ function renderDay(host){
         else attrs=` title="${esc(nm)}"`;
       } else if(st==='busy'){
         const iv=busyAt(c.id,s,e);
-        const disp=dispLabel(iv); label=short(disp);
-        if(iv&&iv.typeColor) attrs=` title="${esc(disp)}" style="background:${esc(iv.typeColor)};background-image:none;color:${textOn(iv.typeColor)}"`;
+        const disp=dispLabel(iv); label=short(disp); const col=dispColor(iv);
+        if(col) attrs=` title="${esc(disp)}" style="background:${esc(col)};background-image:none;color:${textOn(col)}"`;
         else attrs=` title="${esc(disp)}"`;
       } else if(st==='free'){
         const col=windowColorFor(c,s); if(col) attrs=` data-tint style="--tint:${esc(col)}2e"`;
@@ -450,8 +465,8 @@ function renderWeek(host){
           else attrs=` title="${esc(nm)}"`;
         } else if(st==='busy'){
           const iv=busyAt(c.id,s,e);
-          const disp=dispLabel(iv); label=short(disp,9);
-          if(iv&&iv.typeColor) attrs=` title="${esc(disp)}" style="background:${esc(iv.typeColor)};background-image:none;color:${textOn(iv.typeColor)}"`;
+          const disp=dispLabel(iv); label=short(disp,9); const col=dispColor(iv);
+          if(col) attrs=` title="${esc(disp)}" style="background:${esc(col)};background-image:none;color:${textOn(col)}"`;
           else attrs=` title="${esc(disp)}"`;
         } else if(st==='free'){
           const col=windowColorFor(c,s); if(col) attrs=` data-tint style="--tint:${esc(col)}2e"`;

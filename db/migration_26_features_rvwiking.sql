@@ -74,7 +74,7 @@ grant select on public.court_busy to anon, authenticated;
 insert into public.clubs (slug, name, owner_email, active, timezone, currency, features)
 values (
   'rv-wiking-linz', 'RV Wiking Linz', 'florian.a.haslinger@gmail.com', true, 'Europe/Vienna', 'EUR',
-  '{"bulk_abo_invoice":true,"membership_reminder":true,"guest_label":true,"abo_names":true,"legend_cards":true,"topup_bonus":{"tiers":[{"pay":90,"credit":100},{"pay":150,"credit":175}]}}'::jsonb
+  '{"bulk_abo_invoice":true,"membership_reminder":true,"guest_label":true,"abo_names":true,"abo_plain":true,"legend_cards":true,"manual_abo":true,"topup_bonus":{"tiers":[{"pay":90,"credit":100},{"pay":150,"credit":175}]}}'::jsonb
 )
 on conflict (slug) do update
   set name = excluded.name,

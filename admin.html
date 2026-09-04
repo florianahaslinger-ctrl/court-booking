@@ -456,6 +456,7 @@
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftAboNames" style="width:auto;margin:0"> Abo-Buchungen mit Namen (statt „Abo · offen")</label>
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftLegendCards" style="width:auto;margin:0"> Legende als Karten (Preise + Buchungen)</label>
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftManualAbo" style="width:auto;margin:0"> Abos nur über Admin (Preis + Stunden/Enddatum; kein Self-Service)</label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftAboPlain" style="width:auto;margin:0"> Abos im Raster einfarbig blau (kein offen/bezahlt; Status nur im Admin)</label>
         </div>
         <h3 style="font-size:14px;margin:16px 0 4px">Bonus-Aufladungen (Guthaben)</h3>
         <span class="sub">Pro Zeile „zahlen → gutschreiben" (z. B. 90 → 100). Keine Zeile = kein Bonus.</span>
@@ -856,6 +857,7 @@ function renderFeatures(){
   set('ftAboNames',F.abo_names);
   set('ftLegendCards',F.legend_cards);
   set('ftManualAbo',F.manual_abo);
+  set('ftAboPlain',F.abo_plain);
   const rows=$('#ftBonusRows'); if(!rows) return;
   rows.innerHTML='';
   const tiers=(F.topup_bonus && Array.isArray(F.topup_bonus.tiers))?F.topup_bonus.tiers:[];
@@ -880,6 +882,7 @@ function collectFeatures(){
   if($('#ftAboNames').checked) F.abo_names=true;
   if($('#ftLegendCards').checked) F.legend_cards=true;
   if($('#ftManualAbo').checked) F.manual_abo=true;
+  if($('#ftAboPlain').checked) F.abo_plain=true;
   const tiers=[];
   $('#ftBonusRows').querySelectorAll('.field-row').forEach(r=>{
     const pay=Number(r.querySelector('.ftPay').value), credit=Number(r.querySelector('.ftCredit').value);
