@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     const resp = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: { "api-key": BREVO_KEY, "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify({ sender: { name: SENDER_NAME, email: SENDER_EMAIL }, to: [{ email, name }], subject, htmlContent: html, textContent: text }),
+      body: JSON.stringify({ sender: { name: SENDER_NAME, email: SENDER_EMAIL }, to: [name ? { email, name } : { email }], subject, htmlContent: html, textContent: text }),
     });
     if (!resp.ok) {
       const t = await resp.text().catch(() => "");
