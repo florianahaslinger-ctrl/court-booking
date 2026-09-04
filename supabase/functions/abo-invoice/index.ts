@@ -93,11 +93,14 @@ Deno.serve(async (req) => {
     if (!resp.ok) {
       const t = await resp.text().catch(() => "");
       console.error("Brevo error", resp.status, t);
-      return json({ error: "E-Mail-Versand fehlgeschlagen." }, 502);
+      let detail = "";
+      try { detail = (JSON.parse(t)?.message as string) || ""; } catch { detail = t.slice(0, 200); }
+      // Fachlicher Fehler als 200 mit {error}, damit im UI der echte Grund statt „non-2xx" erscheint.
+      return json({ error: `E-Mail konnte nicht an ${email} gesendet werden${detail ? " (" + detail + ")" : ` (Brevo-Status ${resp.status})`}.` }, 200);
     }
     return json({ ok: true, sent_to: email });
   } catch (e) {
     console.error(e);
-    return json({ error: "Interner Fehler: " + (e as Error).message }, 500);
+    return json({ error: "Interner Fehler beim Rechnungsversand: " + (e as Error).message }, 200);
   }
 });
