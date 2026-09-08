@@ -50,6 +50,26 @@ Deno.serve(async (req) => {
     if (!club) return json({ error: "Club nicht gefunden." }, 404);
 
     let acct = club.stripe_account_id as string | null;
+    let chargesEnabled = false;
+    let rejected = false;
+
+    // Bestehendes Konto prüfen. Ein von Stripe abgelehntes Konto (disabled_reason
+    // "rejected.*") lässt sich NICHT reaktivieren und akzeptiert auch keinen
+    // Onboarding-Link mehr -> verwerfen, damit ein frisches Konto angelegt wird.
+    if (acct) {
+      const a = await stripe("accounts/" + acct, "GET");
+      const disabled = String(a?.requirements?.disabled_reason ?? "");
+      if (/^rejected/.test(disabled)) {
+        rejected = true;
+        acct = null;
+        await admin.from("clubs").update({ stripe_account_id: null, stripe_enabled: false }).eq("id", club_id);
+      } else {
+        chargesEnabled = !!a.charges_enabled;
+        if (chargesEnabled !== club.stripe_enabled) {
+          await admin.from("clubs").update({ stripe_enabled: chargesEnabled }).eq("id", club_id);
+        }
+      }
+    }
 
     if (!acct && action === "link") {
       const created = await stripe("accounts", "POST",
@@ -61,24 +81,15 @@ Deno.serve(async (req) => {
       await admin.from("clubs").update({ stripe_account_id: acct }).eq("id", club_id);
     }
 
-    let chargesEnabled = false;
-    if (acct) {
-      const a = await stripe("accounts/" + acct, "GET");
-      chargesEnabled = !!a.charges_enabled;
-      if (chargesEnabled !== club.stripe_enabled) {
-        await admin.from("clubs").update({ stripe_enabled: chargesEnabled }).eq("id", club_id);
-      }
-    }
-
     if (action === "link") {
       const ret = `${SITE_URL}/admin.html?club=${encodeURIComponent(club.slug)}&stripe=return`;
       const link = await stripe("account_links", "POST",
         "account=" + acct + "&type=account_onboarding" +
         "&refresh_url=" + encodeURIComponent(ret) + "&return_url=" + encodeURIComponent(ret));
-      return json({ url: link.url, hasAccount: !!acct, chargesEnabled });
+      return json({ url: link.url, hasAccount: !!acct, chargesEnabled, rejected });
     }
 
-    return json({ hasAccount: !!acct, chargesEnabled });
+    return json({ hasAccount: !!acct, chargesEnabled, rejected });
   } catch (e) {
     const m = (e as Error).message || "";
     if (/platform.?profile|managing losses|responsibilities/i.test(m)) {
