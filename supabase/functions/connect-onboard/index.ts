@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     if (!acct && action === "link") {
       const created = await stripe("accounts", "POST",
         "type=express&country=AT&email=" + encodeURIComponent(email) +
-        "&business_type=company" +
+        "&business_type=individual" +
         "&capabilities[card_payments][requested]=true&capabilities[transfers][requested]=true" +
         "&metadata[club_id]=" + encodeURIComponent(club_id));
       acct = created.id;
