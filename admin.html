@@ -333,7 +333,7 @@
 
     <!-- ABOS -->
     <div class="tabpane" id="tab-abos">
-      <div class="card">
+      <div class="card" id="aboPayModeCard">
         <h2>Abo-Zahlmodus</h2>
         <span class="sub">Wie werden Abos bezahlt? Gilt für neue Abos dieses Clubs.</span>
         <div class="field-row" style="margin-top:10px;align-items:flex-end">
@@ -362,7 +362,7 @@
         <div id="abManual" style="display:none">
           <div class="field-row">
             <div><label>Preis (€ gesamt)</label><input type="number" id="abPrice" min="0" step="0.5" value="0"></div>
-            <div><label>Laufzeit nach</label><select id="abMode"><option value="date">Enddatum</option><option value="hours">Stundenkontingent</option></select></div>
+            <div><label>Laufzeit nach</label><select id="abMode"><option value="hours">Stundenkontingent</option><option value="date">Enddatum</option></select></div>
             <div id="abHoursWrap" style="display:none"><label>Stunden</label><input type="number" id="abHours" min="1" step="1" value="50"></div>
           </div>
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400;margin-top:6px"><input type="checkbox" id="abPaid" style="width:auto;margin:0"> Sofort als bezahlt markieren (Zahlung in Persona)</label>
@@ -842,6 +842,8 @@ function togglePricingFields(){
 function syncAboForm(){
   const manual=!!(club && club.features && club.features.manual_abo);
   const mb=$('#abManual'); if(mb) mb.style.display = manual ? '' : 'none';
+  // Bei manuellen Abos (z. B. RV Wiking) gibt es keinen Online-Zahlmodus (Serie/Woche)
+  const pmc=$('#aboPayModeCard'); if(pmc) pmc.style.display = manual ? 'none' : '';
   const hours = manual && $('#abMode') && $('#abMode').value==='hours';
   const hw=$('#abHoursWrap'); if(hw) hw.style.display = hours ? '' : 'none';
   const tw=$('#abToWrap'); if(tw) tw.style.display = hours ? 'none' : '';
