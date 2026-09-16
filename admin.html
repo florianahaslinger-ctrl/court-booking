@@ -1315,7 +1315,7 @@ function tourCreateForm(){
 }
 function tourRegAdmin(){
   const chips = adminTourParts.length
-    ? adminTourParts.map(p=>`<span class="tour-chip" style="background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:13px">${escA(tAdName(p.member_id))}${p.itn?` · ITN ${escA(p.itn)}`:''}</span>`).join(' ')
+    ? adminTourParts.map(p=>`<span class="tour-chip" style="display:inline-flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:5px 8px 5px 12px;font-size:13px">${escA(tAdName(p.member_id))}${p.itn?` · ITN ${escA(p.itn)}`:''}<button class="tAdRemove" data-mid="${p.member_id}" title="Teilnehmer entfernen" style="border:0;background:transparent;color:var(--bad);cursor:pointer;font-weight:700;line-height:1;padding:0 2px">✕</button></span>`).join(' ')
     : '<span class="sub">Noch keine Anmeldungen.</span>';
   return `<div class="field-row" style="align-items:flex-end">
       <div><label>Anmeldefrist</label><input type="datetime-local" id="tAdDeadline2" value="${tAdLocal(adminTour.registration_deadline)}"></div>
@@ -1334,6 +1334,7 @@ function tourSeedAdmin(){
       <span class="nm">${escA(tAdName(id))}${itn?` <span class="sub" style="font-weight:400">· ITN ${escA(itn)}</span>`:''}</span>
       <button class="btn btn-ghost btn-sm tAdUp" data-i="${i}" ${i===0?'disabled':''}>↑</button>
       <button class="btn btn-ghost btn-sm tAdDown" data-i="${i}" ${i===adminSeedOrder.length-1?'disabled':''}>↓</button>
+      <button class="btn btn-danger btn-sm tAdRemove" data-mid="${id}" title="Teilnehmer entfernen">✕</button>
     </div>`;}).join('');
   return `<p class="sub">Reihe die Teilnehmer von <b>bester (1)</b> bis schlechtester. Beim Auslosen bekommen die Topgereihten die Freilose, Beste und Schwächste liegen im Baum weit auseinander.</p>
     <div style="margin:10px 0"><button class="btn btn-ghost btn-sm" id="tAdSortItn">↕ Nach ITN vorsortieren</button></div>
@@ -1396,6 +1397,10 @@ async function onTourAdminClick(e){
     const i=+t.dataset.i, j=t.classList.contains('tAdUp')?i-1:i+1;
     if(j<0||j>=adminSeedOrder.length) return;
     [adminSeedOrder[i],adminSeedOrder[j]]=[adminSeedOrder[j],adminSeedOrder[i]]; renderTourAdmin(); return;
+  }
+  if(t.classList.contains('tAdRemove')){
+    if(!confirm('Diese Person aus dem Turnier entfernen?')) return;
+    return void rpc('tournament_remove_participant',{p_tournament_id:tid,p_member_id:t.dataset.mid},'Teilnehmer entfernt.');
   }
   if(t.id==='tAdSortItn'){
     // Niedrigere ITN = besser = Seed 1; ohne ITN ans Ende (stabile Reihenfolge)
