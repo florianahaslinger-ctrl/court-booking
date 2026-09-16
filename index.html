@@ -166,7 +166,7 @@ $('#yr').textContent = new Date().getFullYear();
 const sb = window.cbClient();
 window.CB.wireClubNav();
 const params = new URLSearchParams(location.search);
-const slug = params.get('club') || window.CB_CONFIG.DEFAULT_CLUB;
+const slug = window.CB.resolveClub();
 const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 const MON = ['Jan','Feb','März','Apr','Mai','Juni','Juli','Aug','Sep','Okt','Nov','Dez'];
 

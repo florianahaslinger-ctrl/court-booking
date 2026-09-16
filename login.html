@@ -57,7 +57,7 @@
 const sb = window.cbClient();
 window.CB.wireClubNav();
 const params = new URLSearchParams(location.search);
-const slug = params.get('club') || window.CB_CONFIG.DEFAULT_CLUB;
+const slug = window.CB.resolveClub();
 let mode = 'signin'; // oder 'signup'
 const $ = s => document.querySelector(s);
 const msg = (t, cls='error') => { const m=$('#msg'); m.className='msg show '+cls; m.textContent=t; };

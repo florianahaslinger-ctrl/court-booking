@@ -97,12 +97,26 @@ window.CB = {
 function round2(n) { return Math.round(n * 100) / 100; }
 function hm(t) { if (!t) return 0; const p = String(t).split(':'); return (+p[0]) * 60 + (+p[1] || 0); }
 
-// Aktuellen ?club=-Parameter erhalten: an interne Nav-Links (index/konto/login) anhängen,
-// damit man beim Wechsel nicht auf den Default-Club zurückfällt.
+// Zuletzt gewählten Club merken: expliziter ?club= gewinnt und wird gespeichert;
+// fehlt er (nackte Domain, Login-Rücksprung, Marketing-Seite), wird der gemerkte
+// Club verwendet, damit man nicht auf den Default-Club zurückgeworfen wird.
+window.CB.currentClub = function () {
+  let c = new URLSearchParams(location.search).get('club');
+  try {
+    if (c) localStorage.setItem('cb_club', c);
+    else   c = localStorage.getItem('cb_club');
+  } catch (e) { /* localStorage evtl. blockiert */ }
+  return c || null;
+};
+// Aufzulösender Club für die Seite (mit Default als letzter Rückfall).
+window.CB.resolveClub = function () {
+  return window.CB.currentClub() || window.CB_CONFIG.DEFAULT_CLUB;
+};
 window.CB.clubQuery = function () {
-  const c = new URLSearchParams(location.search).get('club');
+  const c = window.CB.currentClub();
   return c ? ('?club=' + encodeURIComponent(c)) : '';
 };
+// ?club= an interne Nav-Links (index/konto/login) anhängen.
 window.CB.wireClubNav = function () {
   const q = window.CB.clubQuery();
   if (!q) return;
