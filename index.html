@@ -6,6 +6,29 @@
 <title>Platz buchen</title>
 <link rel="stylesheet" href="assets/fonts.css">
 <link rel="stylesheet" href="assets/theme.css">
+<style>
+  /* Turnierbaum */
+  .tour-bracket{display:flex;gap:26px;overflow-x:auto;padding:8px 2px 14px}
+  .tour-round{display:flex;flex-direction:column;min-width:190px;flex:0 0 auto}
+  .tour-round-h{font-weight:700;font-size:13px;color:var(--ink-soft);text-align:center;margin-bottom:10px;
+    text-transform:uppercase;letter-spacing:.04em}
+  .tour-round-matches{display:flex;flex-direction:column;justify-content:space-around;flex:1;gap:14px}
+  .tour-match{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}
+  .tour-player{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;font-size:14px;
+    border-bottom:1px solid var(--line)}
+  .tour-player:last-of-type{border-bottom:0}
+  .tour-player .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tour-player .sd{color:var(--muted);font-size:11px;margin-right:6px}
+  .tour-player.win{background:rgba(46,139,87,.10);font-weight:700}
+  .tour-player.win .nm{color:var(--brand-dark)}
+  .tour-player.bye{color:var(--muted);font-style:italic}
+  .tour-match-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);
+    border-top:1px solid var(--line);font-size:12px}
+  .tour-score{color:var(--ink-soft);font-variant-numeric:tabular-nums}
+  .tour-plist{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .tour-chip{background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:13px}
+  .tour-chip .sd{color:var(--muted);font-size:11px;margin-right:5px}
+</style>
 </head>
 <body>
 <nav class="nav">
@@ -13,6 +36,7 @@
   <div class="links">
     <a href="index.html" class="active">Buchen</a>
     <a href="konto.html">Mein Konto</a>
+    <a href="#" id="tournamentNav" style="display:none">🏆 Turnier</a>
     <a href="admin.html" id="adminLink" style="display:none">Verwaltung</a>
     <a href="login.html" class="btn btn-ghost btn-sm">Mitglieder-Login</a>
   </div>
@@ -114,6 +138,21 @@
   </div>
 </div>
 
+<!-- Turnier-Modal -->
+<div class="modal-backdrop" id="tourModal">
+  <div class="modal" style="max-width:min(980px,96vw)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:4px">
+      <div>
+        <h2 id="tourName" style="margin:0">Turnier</h2>
+        <div class="sub" id="tourStatus"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="tourClose">Schließen</button>
+    </div>
+    <div id="tourMsg" class="msg"></div>
+    <div id="tourBody"></div>
+  </div>
+</div>
+
 <footer class="foot">
   <span>© <span id="yr"></span> Court Booking</span>
   <span><a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a> · Teil der Core-Management-Produktfamilie</span>
@@ -133,6 +172,7 @@ const MON = ['Jan','Feb','März','Apr','Mai','Juni','Juli','Aug','Sep','Okt','No
 
 let club=null, courts=[], hours=[], priceWindows=[], bookingTypes=[], busy=[], mine=[], myMember=null, session=null;
 let memberOptions=[], players=[], myBalance=0;
+let isAdmin=false, tour=null, tourParts=[], tourMatches=[];
 let view='day', envFilter='all', anchor=new Date(), weekCourtId=null, pending=null;
 
 const msg=(t,cls='error')=>{const m=$('#msg');m.className='msg show '+cls;m.textContent=t;};
@@ -177,7 +217,7 @@ async function init(){
     if(m){myMember=m;$('#memberBadge').style.display='inline-flex';$('#guestFields').style.display='none';}
     // Admin-Link nur für Club-/Head-Admins
     const { data:adminRow }=await sb.from('app_admins').select('email').ilike('email',session.user.email).maybeSingle();
-    if(adminRow){ const a=$('#adminLink'); a.href='admin.html'+location.search; a.style.display=''; }
+    if(adminRow){ isAdmin=true; const a=$('#adminLink'); a.href='admin.html'+location.search; a.style.display=''; }
   }
   // Mitglieder-Auswahl für Mitspieler (nur für eingeloggte Mitglieder/Admins befüllt; Gäste bekommen leere Liste)
   const { data:mo }=await sb.rpc('club_member_options',{p_club_slug:slug});
@@ -233,6 +273,7 @@ async function init(){
   $('#addPlayer').onclick=()=>{ if(players.length<3){players.push({sel:'guest',name:''}); renderPlayers(); recalc();} };
 
   await loadRange();
+  initTournament();
 
   // Rückkehr von Stripe
   if(params.get('paid')){ sessionStorage.removeItem('cb_pending'); msg('Zahlung erfolgreich – deine Buchung ist bestätigt. Danke! 🎾','ok'); }
@@ -696,6 +737,121 @@ async function confirmBooking(){
   $('#bookModal').classList.remove('open');
   msg('Buchung bestätigt!'+(data.paid_with==='credit'?' Per Guthaben bezahlt.':'')+' '+fmtHM(s)+'–'+fmtHM(e),'ok');
   loadRange();
+}
+
+// ================= Turnier (Feature "tournament") =================
+let tourEditMid=null;
+function tourNameOf(id){ if(!id) return '—'; const m=memberOptions.find(x=>x.id===id);
+  return m?m.full_name:(myMember&&myMember.id===id?myMember.full_name:'Teilnehmer'); }
+function tmsg(t,cls='info'){ const m=$('#tourMsg'); m.className='msg show '+cls; m.textContent=t; }
+function tourDT(s){ const d=new Date(s); return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function roundLabel(r,total){ return ({0:'Finale',1:'Halbfinale',2:'Viertelfinale',3:'Achtelfinale'})[total-r]||('Runde '+r); }
+
+async function initTournament(){
+  if(!(club.features && club.features.tournament)) return;
+  if(!myMember && !isAdmin) return;
+  const { data:tr } = await sb.from('tournaments').select('*').eq('club_id',club.id).order('created_at',{ascending:false}).limit(1);
+  tour=(tr&&tr[0])||null;
+  if(!tour) return;
+  const nav=$('#tournamentNav'); nav.style.display='';
+  nav.onclick=e=>{ e.preventDefault(); openTournament(); };
+  $('#tourClose').onclick=()=>$('#tourModal').classList.remove('open');
+  $('#tourBody').addEventListener('click', onTourClick);
+}
+async function openTournament(){ await loadTournament(); $('#tourModal').classList.add('open'); }
+async function loadTournament(){
+  tourEditMid=null;
+  const { data:t } = await sb.from('tournaments').select('*').eq('id',tour.id).maybeSingle(); if(t) tour=t;
+  const { data:ps } = await sb.from('tournament_participants').select('*').eq('tournament_id',tour.id); tourParts=ps||[];
+  const { data:ms } = await sb.from('tournament_matches').select('*').eq('tournament_id',tour.id).order('round').order('slot'); tourMatches=ms||[];
+  renderTournament();
+}
+function renderTournament(){
+  $('#tourName').textContent=tour.name;
+  $('#tourStatus').textContent=({registration:'Anmeldung offen',seeding:'Auslosung folgt',running:'Läuft',done:'Beendet'})[tour.status]||'';
+  $('#tourMsg').className='msg';
+  const body=$('#tourBody');
+  if(tour.status==='registration') body.innerHTML=renderReg();
+  else if(tour.status==='seeding') body.innerHTML=renderSeeding();
+  else body.innerHTML=renderBracket();
+}
+function renderReg(){
+  const iAmIn = myMember && tourParts.some(p=>p.member_id===myMember.id);
+  const past = tour.registration_deadline && new Date(tour.registration_deadline) < new Date();
+  const dl = tour.registration_deadline ? `Anmeldung bis <b>${tourDT(tour.registration_deadline)}</b>` : 'Keine feste Anmeldefrist';
+  let action;
+  if(!myMember) action=`<div class="sub">Nur Mitglieder können sich anmelden.</div>`;
+  else if(past) action=`<div class="sub">Die Anmeldefrist ist abgelaufen.</div>`;
+  else if(iAmIn) action=`<button class="btn btn-ghost" id="tourUnreg">Abmelden</button>`;
+  else action=`<button class="btn btn-primary" id="tourReg">Jetzt anmelden</button>`;
+  const chips = tourParts.length
+    ? tourParts.map(p=>`<span class="tour-chip">${esc(tourNameOf(p.member_id))}</span>`).join('')
+    : '<span class="sub">Noch keine Anmeldungen.</span>';
+  return `<p>${dl}</p><div style="margin:12px 0">${action}</div>
+    <div style="font-weight:600;margin-top:8px">Angemeldet (${tourParts.length})</div>
+    <div class="tour-plist">${chips}</div>`;
+}
+function renderSeeding(){
+  const ranked=[...tourParts].sort((a,b)=>(a.seed||999)-(b.seed||999));
+  const chips=ranked.map(p=>`<span class="tour-chip">${p.seed?`<span class="sd">#${p.seed}</span>`:''}${esc(tourNameOf(p.member_id))}</span>`).join('');
+  return `<p class="sub">Die Anmeldung ist geschlossen. Die Auslosung nimmt die Verwaltung vor – der Turnierbaum erscheint dann hier.</p>
+    <div style="font-weight:600;margin-top:8px">Teilnehmer (${tourParts.length})</div>
+    <div class="tour-plist">${chips}</div>`;
+}
+function renderBracket(){
+  if(!tourMatches.length) return '<p class="sub">Der Turnierbaum wurde noch nicht erstellt.</p>';
+  const totalRounds=Math.max(...tourMatches.map(m=>m.round));
+  const fin=tourMatches.find(m=>m.round===totalRounds);
+  const champ=(fin&&fin.winner_member_id)
+    ? `<div style="margin-bottom:12px;font-weight:700;color:var(--brand-dark);font-size:16px">🏆 Sieger: ${esc(tourNameOf(fin.winner_member_id))}</div>` : '';
+  let cols='';
+  for(let r=1;r<=totalRounds;r++){
+    const ms=tourMatches.filter(m=>m.round===r).sort((a,b)=>a.slot-b.slot);
+    cols+=`<div class="tour-round"><div class="tour-round-h">${roundLabel(r,totalRounds)}</div>
+      <div class="tour-round-matches">${ms.map(matchCard).join('')}</div></div>`;
+  }
+  return champ+`<div class="tour-bracket">${cols}</div>`;
+}
+function matchCard(m){
+  const editing = tourEditMid===m.id;
+  const canEdit = (isAdmin || !!myMember) && tour.status==='running' && m.p1_member_id && m.p2_member_id;
+  const w=m.winner_member_id;
+  const row=(id,otherId,win)=> !id
+    ? `<div class="tour-player bye"><span class="nm">${otherId?'Freilos':'—'}</span></div>`
+    : `<div class="tour-player ${win?'win':''}"><span class="nm">${esc(tourNameOf(id))}</span>${win?'<span>✓</span>':''}</div>`;
+  let foot;
+  if(editing){
+    foot=`<input type="text" class="tour-score-in" data-mid="${m.id}" value="${esc(m.score||'')}" placeholder="6-1;3-6;6-4" style="flex:1;min-width:0;height:32px;margin:0">
+      <button class="btn btn-primary btn-sm tour-save" data-mid="${m.id}">OK</button>
+      <button class="btn btn-ghost btn-sm tour-cancel">×</button>`;
+  } else {
+    const sc=m.score
+      ? `<span class="tour-score">${esc(m.score)}</span>`
+      : `<span class="tour-score" style="color:var(--muted)">${(m.p1_member_id&&m.p2_member_id)?'offen':'wartet…'}</span>`;
+    foot=sc+(canEdit?`<button class="btn btn-ghost btn-sm tour-res" data-mid="${m.id}">${m.score?'Ändern':'Ergebnis'}</button>`:'');
+  }
+  return `<div class="tour-match">${row(m.p1_member_id,m.p2_member_id,w&&w===m.p1_member_id)}${row(m.p2_member_id,m.p1_member_id,w&&w===m.p2_member_id)}<div class="tour-match-foot">${foot}</div></div>`;
+}
+async function onTourClick(e){
+  const t=e.target;
+  if(t.id==='tourReg')  return void await doReg('tournament_register');
+  if(t.id==='tourUnreg')return void await doReg('tournament_unregister');
+  if(t.classList.contains('tour-res')){ tourEditMid=t.dataset.mid; renderTournament(); const i=$('.tour-score-in'); if(i) i.focus(); return; }
+  if(t.classList.contains('tour-cancel')){ tourEditMid=null; renderTournament(); return; }
+  if(t.classList.contains('tour-save')) return void await saveResult(t.dataset.mid);
+}
+async function doReg(fn){
+  const { error } = await sb.rpc(fn,{p_tournament_id:tour.id});
+  if(error){ tmsg(error.message,'error'); return; }
+  await loadTournament();
+}
+async function saveResult(mid){
+  const inp=document.querySelector('.tour-score-in[data-mid="'+mid+'"]');
+  const score=inp?inp.value.trim():'';
+  if(!score){ tmsg('Bitte ein Ergebnis eingeben, z. B. 6-1;3-6;6-4','error'); return; }
+  const { error } = await sb.rpc('tournament_set_result',{p_match_id:mid,p_score:score});
+  if(error){ tmsg(error.message,'error'); return; }
+  tourEditMid=null; await loadTournament();
 }
 </script>
 </body>

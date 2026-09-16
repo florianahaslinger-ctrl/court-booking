@@ -16,6 +16,22 @@
   .tabgroup[open]>summary::before{transform:rotate(90deg)}
   .tabgroup>summary:hover{background:var(--brand-50)}
   .tabgroup .tabs{border-bottom:none;margin:0;padding:0 12px 12px;flex-wrap:wrap}
+  /* Turnierbaum */
+  .tour-bracket{display:flex;gap:26px;overflow-x:auto;padding:8px 2px 14px}
+  .tour-round{display:flex;flex-direction:column;min-width:200px;flex:0 0 auto}
+  .tour-round-h{font-weight:700;font-size:13px;color:var(--ink-soft);text-align:center;margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em}
+  .tour-round-matches{display:flex;flex-direction:column;justify-content:space-around;flex:1;gap:14px}
+  .tour-match{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}
+  .tour-player{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;font-size:14px;border-bottom:1px solid var(--line)}
+  .tour-player:last-of-type{border-bottom:0}
+  .tour-player .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tour-player.win{background:rgba(46,139,87,.10);font-weight:700}
+  .tour-player.bye{color:var(--muted);font-style:italic}
+  .tour-match-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border-top:1px solid var(--line);font-size:12px}
+  .tour-score{color:var(--ink-soft);font-variant-numeric:tabular-nums}
+  .seed-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+  .seed-row .rk{font-weight:700;color:var(--brand-600);min-width:26px}
+  .seed-row .nm{flex:1}
 </style>
 </head>
 <body>
@@ -47,6 +63,7 @@
           <button data-tab="belegung">Belegung &amp; Sperren</button>
           <button data-tab="abos">Abos</button>
           <button data-tab="guthaben">Guthaben</button>
+          <button data-tab="turnier" id="tournamentTab" style="display:none">🏆 Turnier</button>
         </div>
       </details>
       <details class="tabgroup">
@@ -432,6 +449,15 @@
     </div>
 
     <!-- CLUBS (nur Head-Admin) -->
+    <div class="tabpane" id="tab-turnier">
+      <div class="card">
+        <h2>Turnier / Clubmeisterschaft</h2>
+        <span class="sub">Anmeldung → Reihung → Auslosung (K.-o.-Baum) → Ergebnisse. Mitglieder sehen alles über den Turnier-Button oben rechts.</span>
+        <div id="tourAdminMsg" class="msg"></div>
+        <div id="tourAdminBody" style="margin-top:14px"></div>
+      </div>
+    </div>
+
     <div class="tabpane" id="tab-clubs">
       <div class="card">
         <h2>Neuen Club anlegen</h2>
@@ -457,6 +483,7 @@
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftLegendCards" style="width:auto;margin:0"> Legende als Karten (Preise + Buchungen)</label>
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftManualAbo" style="width:auto;margin:0"> Abos nur über Admin (Preis + Stunden/Enddatum; kein Self-Service)</label>
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftAboPlain" style="width:auto;margin:0"> Abos im Raster einfarbig blau (kein offen/bezahlt; Status nur im Admin)</label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:400"><input type="checkbox" id="ftTournament" style="width:auto;margin:0"> 🏆 Turnier / Clubmeisterschaft (Turnierbaum oben rechts, Anmeldung, Auslosung, Ergebnisse)</label>
         </div>
         <h3 style="font-size:14px;margin:16px 0 4px">Bonus-Aufladungen (Guthaben)</h3>
         <span class="sub">Pro Zeile „zahlen → gutschreiben" (z. B. 90 → 100). Keine Zeile = kein Bonus.</span>
@@ -482,6 +509,7 @@ const $ = s => document.querySelector(s);
 const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 const SURF = {clay:'Sand', hard:'Hart', carpet:'Teppich', grass:'Rasen'};
 let me = null, isHead = false, club = null, clubs = [], courts = [], members = [], bookingTypes = [], priceWindows = [];
+let adminTour = null, adminTourParts = [], adminTourMatches = [], adminSeedOrder = [], adminTourEditMid = null;
 
 init();
 
@@ -565,11 +593,13 @@ async function selectClub(c) {
   renderFeatures();
   const F = club.features || {};
   $('#abInvoiceAll').style.display = F.bulk_abo_invoice ? '' : 'none';
+  $('#tournamentTab').style.display = F.tournament ? '' : 'none';
   syncAboForm();
 
   initPwDays();
   await Promise.all([loadCourts(), loadHours(), loadMembers(), loadPriceWindows(), loadBookingTypes()]);
   loadBookings(); loadAbos(); loadOccupancies(); loadStats(); loadWalletAdmin(); loadClubAdmins(); loadPlans(); loadMemberOverview(); loadGuests();
+  if(club.features && club.features.tournament) loadTournamentAdmin();
   refreshStripeStatus(false);
   if(isHead) loadClubsTable();
   if(params.get('stripe')==='return'){
@@ -860,6 +890,7 @@ function renderFeatures(){
   set('ftLegendCards',F.legend_cards);
   set('ftManualAbo',F.manual_abo);
   set('ftAboPlain',F.abo_plain);
+  set('ftTournament',F.tournament);
   const rows=$('#ftBonusRows'); if(!rows) return;
   rows.innerHTML='';
   const tiers=(F.topup_bonus && Array.isArray(F.topup_bonus.tiers))?F.topup_bonus.tiers:[];
@@ -885,6 +916,7 @@ function collectFeatures(){
   if($('#ftLegendCards').checked) F.legend_cards=true;
   if($('#ftManualAbo').checked) F.manual_abo=true;
   if($('#ftAboPlain').checked) F.abo_plain=true;
+  if($('#ftTournament').checked) F.tournament=true;
   const tiers=[];
   $('#ftBonusRows').querySelectorAll('.field-row').forEach(r=>{
     const pay=Number(r.querySelector('.ftPay').value), credit=Number(r.querySelector('.ftCredit').value);
@@ -1237,6 +1269,146 @@ async function loadClubsTable(){
 }
 
 function flash(sel,txt,cls){const m=$(sel);m.className='msg show '+cls;m.textContent=txt;setTimeout(()=>{m.className='msg';},4000);}
+
+// ================= Turnier-Verwaltung (Feature "tournament") =================
+const escA=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function tAdName(id){ const m=members.find(x=>x.id===id); return m?(m.full_name||m.email):'—'; }
+function tAdLocal(s){ if(!s) return ''; const d=new Date(s), p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
+function tAdRoundLabel(r,total){ return ({0:'Finale',1:'Halbfinale',2:'Viertelfinale',3:'Achtelfinale'})[total-r]||('Runde '+r); }
+
+async function loadTournamentAdmin(){
+  if(!window._tourAdminWired){ $('#tourAdminBody').addEventListener('click', onTourAdminClick); window._tourAdminWired=true; }
+  adminTourEditMid=null;
+  const { data:tr } = await sb.from('tournaments').select('*').eq('club_id',club.id).order('created_at',{ascending:false}).limit(1);
+  adminTour=(tr&&tr[0])||null;
+  if(adminTour){
+    const { data:ps } = await sb.from('tournament_participants').select('*').eq('tournament_id',adminTour.id); adminTourParts=ps||[];
+    const { data:ms } = await sb.from('tournament_matches').select('*').eq('tournament_id',adminTour.id).order('round').order('slot'); adminTourMatches=ms||[];
+    if(adminTour.status==='seeding'){
+      adminSeedOrder=[...adminTourParts].sort((a,b)=>((a.seed||9999)-(b.seed||9999))||(new Date(a.created_at)-new Date(b.created_at))).map(p=>p.member_id);
+    }
+  } else { adminTourParts=[]; adminTourMatches=[]; adminSeedOrder=[]; }
+  renderTourAdmin();
+}
+function renderTourAdmin(){
+  const b=$('#tourAdminBody'); if(!b) return;
+  if(!adminTour){ b.innerHTML=tourCreateForm(); return; }
+  const st=adminTour.status;
+  let h=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+    <div><b style="font-size:17px">${escA(adminTour.name)}</b>
+      <span class="badge" style="margin-left:6px">${({registration:'Anmeldung offen',seeding:'Reihung/Auslosung',running:'Läuft',done:'Beendet'})[st]||st}</span></div>
+    <button class="btn btn-danger btn-sm" id="tAdDelete">Turnier löschen</button></div>`;
+  if(st==='registration') h+=tourRegAdmin();
+  else if(st==='seeding')  h+=tourSeedAdmin();
+  else                     h+=tourRunAdmin();
+  b.innerHTML=h;
+}
+function tourCreateForm(){
+  return `<p class="sub">Noch kein Turnier angelegt.</p>
+    <div class="field-row" style="margin-top:10px;align-items:flex-end">
+      <div style="flex:2"><label>Name</label><input type="text" id="tAdNameIn" placeholder="Clubmeisterschaft ${new Date().getFullYear()}"></div>
+      <div><label>Anmeldefrist (optional)</label><input type="datetime-local" id="tAdDeadlineIn"></div>
+    </div>
+    <button class="btn btn-primary" id="tAdCreate" style="margin-top:12px">Turnier anlegen &amp; Anmeldung öffnen</button>`;
+}
+function tourRegAdmin(){
+  const chips = adminTourParts.length
+    ? adminTourParts.map(p=>`<span class="tour-chip" style="background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:13px">${escA(tAdName(p.member_id))}</span>`).join(' ')
+    : '<span class="sub">Noch keine Anmeldungen.</span>';
+  return `<div class="field-row" style="align-items:flex-end">
+      <div><label>Anmeldefrist</label><input type="datetime-local" id="tAdDeadline2" value="${tAdLocal(adminTour.registration_deadline)}"></div>
+      <button class="btn btn-ghost btn-sm" id="tAdSaveDeadline">Frist speichern</button>
+    </div>
+    <p style="margin-top:12px;font-weight:600">Anmeldungen (${adminTourParts.length})</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">${chips}</div>
+    <button class="btn btn-primary" id="tAdCloseReg" style="margin-top:16px">Anmeldung schließen → Reihung</button>
+    <p class="hint">Mitglieder melden sich selbst über den Turnier-Button oben rechts an (Frauen &amp; Männer gemeinsam).</p>`;
+}
+function tourSeedAdmin(){
+  const rows=adminSeedOrder.map((id,i)=>`<div class="seed-row">
+      <span class="rk">${i+1}</span><span class="nm">${escA(tAdName(id))}</span>
+      <button class="btn btn-ghost btn-sm tAdUp" data-i="${i}" ${i===0?'disabled':''}>↑</button>
+      <button class="btn btn-ghost btn-sm tAdDown" data-i="${i}" ${i===adminSeedOrder.length-1?'disabled':''}>↓</button>
+    </div>`).join('');
+  return `<p class="sub">Reihe die Teilnehmer von <b>bester (1)</b> bis schlechtester. Beim Auslosen bekommen die Topgereihten die Freilose, Beste und Schwächste liegen im Baum weit auseinander.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin:12px 0;max-width:480px">${rows||'<span class="sub">Keine Teilnehmer.</span>'}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" id="tAdDraw">🎲 Auslosen &amp; Turnierbaum erstellen</button>
+      <button class="btn btn-ghost" id="tAdReopen">Zurück zur Anmeldung</button>
+    </div>`;
+}
+function tourRunAdmin(){
+  const st=adminTour.status;
+  const totalRounds=adminTourMatches.length?Math.max(...adminTourMatches.map(m=>m.round)):0;
+  const fin=adminTourMatches.find(m=>m.round===totalRounds);
+  const champ=(fin&&fin.winner_member_id)?`<div style="margin-bottom:12px;font-weight:700;color:var(--brand-dark);font-size:16px">🏆 Sieger: ${escA(tAdName(fin.winner_member_id))}</div>`:'';
+  let cols='';
+  for(let r=1;r<=totalRounds;r++){
+    const ms=adminTourMatches.filter(m=>m.round===r).sort((a,b)=>a.slot-b.slot);
+    cols+=`<div class="tour-round"><div class="tour-round-h">${tAdRoundLabel(r,totalRounds)}</div>
+      <div class="tour-round-matches">${ms.map(adminMatchCard).join('')}</div></div>`;
+  }
+  const ctrl=`<div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+      ${st==='running'?'<button class="btn btn-primary" id="tAdFinish">Turnier beenden</button>':'<button class="btn btn-ghost" id="tAdReopenRun">Wieder öffnen</button>'}
+      <button class="btn btn-ghost" id="tAdReseed">Neu reihen / auslosen</button>
+    </div>`;
+  return champ+`<div class="tour-bracket">${cols}</div>`+ctrl;
+}
+function adminMatchCard(m){
+  const editing=adminTourEditMid===m.id;
+  const canEdit=adminTour.status==='running' && m.p1_member_id && m.p2_member_id;
+  const w=m.winner_member_id;
+  const row=(id,otherId,win)=> !id
+    ? `<div class="tour-player bye"><span class="nm">${otherId?'Freilos':'—'}</span></div>`
+    : `<div class="tour-player ${win?'win':''}"><span class="nm">${escA(tAdName(id))}</span>${win?'<span>✓</span>':''}</div>`;
+  let foot;
+  if(editing){
+    foot=`<input type="text" class="tAd-score-in" data-mid="${m.id}" value="${escA(m.score||'')}" placeholder="6-1;3-6;6-4" style="flex:1;min-width:0;height:32px;margin:0">
+      <button class="btn btn-primary btn-sm tAd-save" data-mid="${m.id}">OK</button>
+      <button class="btn btn-ghost btn-sm tAd-cancel">×</button>`;
+  } else {
+    const sc=m.score?`<span class="tour-score">${escA(m.score)}</span>`:`<span class="tour-score" style="color:var(--muted)">${(m.p1_member_id&&m.p2_member_id)?'offen':'wartet…'}</span>`;
+    foot=sc+(canEdit?`<button class="btn btn-ghost btn-sm tAd-res" data-mid="${m.id}">${m.score?'Ändern':'Ergebnis'}</button>`:'');
+  }
+  return `<div class="tour-match">${row(m.p1_member_id,m.p2_member_id,w&&w===m.p1_member_id)}${row(m.p2_member_id,m.p1_member_id,w&&w===m.p2_member_id)}<div class="tour-match-foot">${foot}</div></div>`;
+}
+async function onTourAdminClick(e){
+  const t=e.target, tid=adminTour?adminTour.id:null;
+  const rpc=async(fn,args,okMsg)=>{ const {error}=await sb.rpc(fn,args); if(error){ flash('#tourAdminMsg',error.message,'error'); return false; } if(okMsg) flash('#tourAdminMsg',okMsg,'ok'); await loadTournamentAdmin(); return true; };
+  if(t.id==='tAdCreate'){
+    const name=$('#tAdNameIn').value.trim(); const dl=$('#tAdDeadlineIn').value;
+    const { data, error }=await sb.rpc('tournament_create',{p_club_slug:club.slug,p_name:name||('Clubmeisterschaft '+new Date().getFullYear()),p_deadline:dl?new Date(dl).toISOString():null});
+    if(error){ flash('#tourAdminMsg',error.message,'error'); return; }
+    flash('#tourAdminMsg','Turnier angelegt – Anmeldung offen.','ok'); await loadTournamentAdmin(); return;
+  }
+  if(t.id==='tAdSaveDeadline'){ const v=$('#tAdDeadline2').value; return void rpc('tournament_set_deadline',{p_tournament_id:tid,p_deadline:v?new Date(v).toISOString():null},'Frist gespeichert.'); }
+  if(t.id==='tAdCloseReg'){ return void rpc('tournament_set_status',{p_tournament_id:tid,p_status:'seeding'},'Anmeldung geschlossen – bitte reihen.'); }
+  if(t.id==='tAdReopen' || t.id==='tAdReopenRun'){ return void rpc('tournament_set_status',{p_tournament_id:tid,p_status:'registration'},'Anmeldung wieder offen.'); }
+  if(t.id==='tAdReseed'){ return void rpc('tournament_set_status',{p_tournament_id:tid,p_status:'seeding'},'Zurück zur Reihung.'); }
+  if(t.id==='tAdFinish'){ return void rpc('tournament_set_status',{p_tournament_id:tid,p_status:'done'},'Turnier beendet.'); }
+  if(t.classList.contains('tAdUp')||t.classList.contains('tAdDown')){
+    const i=+t.dataset.i, j=t.classList.contains('tAdUp')?i-1:i+1;
+    if(j<0||j>=adminSeedOrder.length) return;
+    [adminSeedOrder[i],adminSeedOrder[j]]=[adminSeedOrder[j],adminSeedOrder[i]]; renderTourAdmin(); return;
+  }
+  if(t.id==='tAdDraw'){
+    const s1=await sb.rpc('tournament_set_seeds',{p_tournament_id:tid,p_member_ids:adminSeedOrder});
+    if(s1.error){ flash('#tourAdminMsg',s1.error.message,'error'); return; }
+    return void rpc('tournament_draw',{p_tournament_id:tid},'Ausgelost – Turnierbaum erstellt.');
+  }
+  if(t.id==='tAdDelete'){ if(!confirm('Turnier inkl. Anmeldungen und Ergebnissen wirklich löschen?')) return; return void rpc('tournament_delete',{p_tournament_id:tid},'Turnier gelöscht.'); }
+  if(t.classList.contains('tAd-res')){ adminTourEditMid=t.dataset.mid; renderTourAdmin(); const i=document.querySelector('.tAd-score-in'); if(i) i.focus(); return; }
+  if(t.classList.contains('tAd-cancel')){ adminTourEditMid=null; renderTourAdmin(); return; }
+  if(t.classList.contains('tAd-save')){
+    const mid=t.dataset.mid, inp=document.querySelector('.tAd-score-in[data-mid="'+mid+'"]');
+    const score=inp?inp.value.trim():'';
+    if(!score){ flash('#tourAdminMsg','Bitte ein Ergebnis eingeben, z. B. 6-1;3-6;6-4','error'); return; }
+    const { error }=await sb.rpc('tournament_set_result',{p_match_id:mid,p_score:score});
+    if(error){ flash('#tourAdminMsg',error.message,'error'); return; }
+    adminTourEditMid=null; await loadTournamentAdmin(); return;
+  }
+}
 </script>
 </body>
 </html>
