@@ -792,8 +792,8 @@ function renderReg(){
     action=`<div class="sub">Die Anmeldefrist ist abgelaufen.</div>`;
   } else {
     action=`<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
-        <div><label style="font-size:13px;font-weight:600">Dein Name</label>
-          <input type="text" id="tourRegName" value="${esc(myMember.full_name||'')}" placeholder="Vor- und Nachname" style="margin:0"></div>
+        <div><label style="font-size:13px;font-weight:600">Anmeldung als</label>
+          <div style="height:40px;display:flex;align-items:center;font-weight:600">${esc(myMember.full_name||myMember.email)}</div></div>
         <div><label style="font-size:13px;font-weight:600">Deine ITN <span class="sub" style="font-weight:400">(1–10)</span></label>
           <input type="text" id="tourRegItn" placeholder="z. B. 6" style="margin:0;max-width:120px"></div>
         <button class="btn btn-primary" id="tourReg">Jetzt anmelden</button>
@@ -861,12 +861,9 @@ async function doReg(fn){
   await loadTournament();
 }
 async function registerMember(){
-  const name=($('#tourRegName')?($('#tourRegName').value):'').trim();
   const itn =($('#tourRegItn') ?($('#tourRegItn').value ):'').trim();
-  if(!name){ tmsg('Bitte gib deinen Namen ein.','error'); return; }
-  const { error } = await sb.rpc('tournament_register',{p_tournament_id:tour.id,p_name:name,p_itn:itn||null});
+  const { error } = await sb.rpc('tournament_register',{p_tournament_id:tour.id,p_itn:itn||null});
   if(error){ tmsg(error.message,'error'); return; }
-  if(myMember) myMember.full_name=name;
   await loadTournament();
 }
 async function saveResult(mid){
