@@ -1273,6 +1273,7 @@ function flash(sel,txt,cls){const m=$(sel);m.className='msg show '+cls;m.textCon
 // ================= Turnier-Verwaltung (Feature "tournament") =================
 const escA=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function tAdName(id){ const m=members.find(x=>x.id===id); return m?(m.full_name||m.email):'—'; }
+function tAdItn(id){ const p=adminTourParts.find(x=>x.member_id===id); return p&&p.itn?p.itn:''; }
 function tAdLocal(s){ if(!s) return ''; const d=new Date(s), p=n=>String(n).padStart(2,'0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
 function tAdRoundLabel(r,total){ return ({0:'Finale',1:'Halbfinale',2:'Viertelfinale',3:'Achtelfinale'})[total-r]||('Runde '+r); }
@@ -1314,7 +1315,7 @@ function tourCreateForm(){
 }
 function tourRegAdmin(){
   const chips = adminTourParts.length
-    ? adminTourParts.map(p=>`<span class="tour-chip" style="background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:13px">${escA(tAdName(p.member_id))}</span>`).join(' ')
+    ? adminTourParts.map(p=>`<span class="tour-chip" style="background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:13px">${escA(tAdName(p.member_id))}${p.itn?` · ITN ${escA(p.itn)}`:''}</span>`).join(' ')
     : '<span class="sub">Noch keine Anmeldungen.</span>';
   return `<div class="field-row" style="align-items:flex-end">
       <div><label>Anmeldefrist</label><input type="datetime-local" id="tAdDeadline2" value="${tAdLocal(adminTour.registration_deadline)}"></div>
@@ -1326,12 +1327,16 @@ function tourRegAdmin(){
     <p class="hint">Mitglieder melden sich selbst über den Turnier-Button oben rechts an (Frauen &amp; Männer gemeinsam).</p>`;
 }
 function tourSeedAdmin(){
-  const rows=adminSeedOrder.map((id,i)=>`<div class="seed-row">
-      <span class="rk">${i+1}</span><span class="nm">${escA(tAdName(id))}</span>
+  const rows=adminSeedOrder.map((id,i)=>{
+    const itn=tAdItn(id);
+    return `<div class="seed-row">
+      <span class="rk">${i+1}</span>
+      <span class="nm">${escA(tAdName(id))}${itn?` <span class="sub" style="font-weight:400">· ITN ${escA(itn)}</span>`:''}</span>
       <button class="btn btn-ghost btn-sm tAdUp" data-i="${i}" ${i===0?'disabled':''}>↑</button>
       <button class="btn btn-ghost btn-sm tAdDown" data-i="${i}" ${i===adminSeedOrder.length-1?'disabled':''}>↓</button>
-    </div>`).join('');
+    </div>`;}).join('');
   return `<p class="sub">Reihe die Teilnehmer von <b>bester (1)</b> bis schlechtester. Beim Auslosen bekommen die Topgereihten die Freilose, Beste und Schwächste liegen im Baum weit auseinander.</p>
+    <div style="margin:10px 0"><button class="btn btn-ghost btn-sm" id="tAdSortItn">↕ Nach ITN vorsortieren</button></div>
     <div style="display:flex;flex-direction:column;gap:8px;margin:12px 0;max-width:480px">${rows||'<span class="sub">Keine Teilnehmer.</span>'}</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-primary" id="tAdDraw">🎲 Auslosen &amp; Turnierbaum erstellen</button>
@@ -1391,6 +1396,12 @@ async function onTourAdminClick(e){
     const i=+t.dataset.i, j=t.classList.contains('tAdUp')?i-1:i+1;
     if(j<0||j>=adminSeedOrder.length) return;
     [adminSeedOrder[i],adminSeedOrder[j]]=[adminSeedOrder[j],adminSeedOrder[i]]; renderTourAdmin(); return;
+  }
+  if(t.id==='tAdSortItn'){
+    // Niedrigere ITN = besser = Seed 1; ohne ITN ans Ende (stabile Reihenfolge)
+    const val=id=>{ const n=parseFloat(String(tAdItn(id)).replace(',','.')); return isNaN(n)?Infinity:n; };
+    adminSeedOrder=adminSeedOrder.map((id,idx)=>({id,idx})).sort((a,b)=>(val(a.id)-val(b.id))||(a.idx-b.idx)).map(x=>x.id);
+    renderTourAdmin(); return;
   }
   if(t.id==='tAdDraw'){
     const s1=await sb.rpc('tournament_set_seeds',{p_tournament_id:tid,p_member_ids:adminSeedOrder});

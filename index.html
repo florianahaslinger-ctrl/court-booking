@@ -761,6 +761,7 @@ async function initTournament(){
 async function openTournament(){ await loadTournament(); $('#tourModal').classList.add('open'); }
 async function loadTournament(){
   tourEditMid=null;
+  const { data:mo } = await sb.rpc('club_member_options',{p_club_slug:slug}); if(mo) memberOptions=mo;
   const { data:t } = await sb.from('tournaments').select('*').eq('id',tour.id).maybeSingle(); if(t) tour=t;
   const { data:ps } = await sb.from('tournament_participants').select('*').eq('tournament_id',tour.id); tourParts=ps||[];
   const { data:ms } = await sb.from('tournament_matches').select('*').eq('tournament_id',tour.id).order('round').order('slot'); tourMatches=ms||[];
@@ -776,16 +777,30 @@ function renderTournament(){
   else body.innerHTML=renderBracket();
 }
 function renderReg(){
-  const iAmIn = myMember && tourParts.some(p=>p.member_id===myMember.id);
+  const mine = myMember && tourParts.find(p=>p.member_id===myMember.id);
   const past = tour.registration_deadline && new Date(tour.registration_deadline) < new Date();
   const dl = tour.registration_deadline ? `Anmeldung bis <b>${tourDT(tour.registration_deadline)}</b>` : 'Keine feste Anmeldefrist';
   let action;
-  if(!myMember) action=`<div class="sub">Nur Mitglieder können sich anmelden.</div>`;
-  else if(past) action=`<div class="sub">Die Anmeldefrist ist abgelaufen.</div>`;
-  else if(iAmIn) action=`<button class="btn btn-ghost" id="tourUnreg">Abmelden</button>`;
-  else action=`<button class="btn btn-primary" id="tourReg">Jetzt anmelden</button>`;
+  if(!myMember){
+    action=`<div class="sub">Nur Mitglieder können sich anmelden.</div>`;
+  } else if(mine){
+    action=`<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <span class="badge member">✓ Angemeldet${mine.itn?` · ITN ${esc(mine.itn)}`:''}</span>
+        ${past?'':'<button class="btn btn-ghost btn-sm" id="tourUnreg">Abmelden</button>'}
+      </div>`;
+  } else if(past){
+    action=`<div class="sub">Die Anmeldefrist ist abgelaufen.</div>`;
+  } else {
+    action=`<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+        <div><label style="font-size:13px;font-weight:600">Dein Name</label>
+          <input type="text" id="tourRegName" value="${esc(myMember.full_name||'')}" placeholder="Vor- und Nachname" style="margin:0"></div>
+        <div><label style="font-size:13px;font-weight:600">Deine ITN <span class="sub" style="font-weight:400">(1–10)</span></label>
+          <input type="text" id="tourRegItn" placeholder="z. B. 6" style="margin:0;max-width:120px"></div>
+        <button class="btn btn-primary" id="tourReg">Jetzt anmelden</button>
+      </div>`;
+  }
   const chips = tourParts.length
-    ? tourParts.map(p=>`<span class="tour-chip">${esc(tourNameOf(p.member_id))}</span>`).join('')
+    ? tourParts.map(p=>`<span class="tour-chip">${esc(tourNameOf(p.member_id))}${p.itn?` <span class="sd">ITN ${esc(p.itn)}</span>`:''}</span>`).join('')
     : '<span class="sub">Noch keine Anmeldungen.</span>';
   return `<p>${dl}</p><div style="margin:12px 0">${action}</div>
     <div style="font-weight:600;margin-top:8px">Angemeldet (${tourParts.length})</div>
@@ -793,7 +808,7 @@ function renderReg(){
 }
 function renderSeeding(){
   const ranked=[...tourParts].sort((a,b)=>(a.seed||999)-(b.seed||999));
-  const chips=ranked.map(p=>`<span class="tour-chip">${p.seed?`<span class="sd">#${p.seed}</span>`:''}${esc(tourNameOf(p.member_id))}</span>`).join('');
+  const chips=ranked.map(p=>`<span class="tour-chip">${p.seed?`<span class="sd">#${p.seed}</span>`:''}${esc(tourNameOf(p.member_id))}${p.itn?` <span class="sd">ITN ${esc(p.itn)}</span>`:''}</span>`).join('');
   return `<p class="sub">Die Anmeldung ist geschlossen. Die Auslosung nimmt die Verwaltung vor – der Turnierbaum erscheint dann hier.</p>
     <div style="font-weight:600;margin-top:8px">Teilnehmer (${tourParts.length})</div>
     <div class="tour-plist">${chips}</div>`;
@@ -834,7 +849,7 @@ function matchCard(m){
 }
 async function onTourClick(e){
   const t=e.target;
-  if(t.id==='tourReg')  return void await doReg('tournament_register');
+  if(t.id==='tourReg')  return void await registerMember();
   if(t.id==='tourUnreg')return void await doReg('tournament_unregister');
   if(t.classList.contains('tour-res')){ tourEditMid=t.dataset.mid; renderTournament(); const i=$('.tour-score-in'); if(i) i.focus(); return; }
   if(t.classList.contains('tour-cancel')){ tourEditMid=null; renderTournament(); return; }
@@ -843,6 +858,15 @@ async function onTourClick(e){
 async function doReg(fn){
   const { error } = await sb.rpc(fn,{p_tournament_id:tour.id});
   if(error){ tmsg(error.message,'error'); return; }
+  await loadTournament();
+}
+async function registerMember(){
+  const name=($('#tourRegName')?($('#tourRegName').value):'').trim();
+  const itn =($('#tourRegItn') ?($('#tourRegItn').value ):'').trim();
+  if(!name){ tmsg('Bitte gib deinen Namen ein.','error'); return; }
+  const { error } = await sb.rpc('tournament_register',{p_tournament_id:tour.id,p_name:name,p_itn:itn||null});
+  if(error){ tmsg(error.message,'error'); return; }
+  if(myMember) myMember.full_name=name;
   await loadTournament();
 }
 async function saveResult(mid){
