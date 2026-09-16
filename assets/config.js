@@ -97,6 +97,42 @@ window.CB = {
 function round2(n) { return Math.round(n * 100) / 100; }
 function hm(t) { if (!t) return 0; const p = String(t).split(':'); return (+p[0]) * 60 + (+p[1] || 0); }
 
+// Supabase-Auth-Fehlermeldungen ins Deutsche übersetzen (Login/Registrierung).
+window.CB.authErr = function (err) {
+  if (!err) return 'Unbekannter Fehler. Bitte versuche es erneut.';
+  const code = String(err.code || err.error_code || '').toLowerCase();
+  const raw  = String(err.message || err.msg || err.error_description || err);
+  const m = raw.toLowerCase();
+  const has = s => m.indexOf(s) !== -1;
+
+  // Netzwerk / Server nicht erreichbar
+  if (err.name === 'AuthRetryableFetchError' || has('failed to fetch') || has('networkerror') || has('load failed'))
+    return 'Verbindung zum Server fehlgeschlagen. Bitte prüfe deine Internetverbindung und versuche es erneut.';
+
+  // Rate-Limit mit Sekundenangabe
+  const sec = raw.match(/after (\d+) second/i);
+  if (sec) return 'Aus Sicherheitsgründen bitte in ' + sec[1] + ' Sekunden erneut versuchen.';
+
+  const map = [
+    [['invalid_credentials', 'invalid login credentials', 'invalid_grant'], 'E-Mail oder Passwort ist falsch.'],
+    [['email_not_confirmed', 'email not confirmed', 'not confirmed'], 'Bitte bestätige zuerst deine E-Mail-Adresse (Link in der Bestätigungs-Mail).'],
+    [['user_already_exists', 'already registered', 'already been registered'], 'Diese E-Mail ist bereits registriert. Bitte melde dich an.'],
+    [['weak_password', 'password should be at least', 'password is too short'], 'Das Passwort ist zu kurz (mindestens 6 Zeichen).'],
+    [['same_password', 'should be different'], 'Das neue Passwort muss sich vom alten unterscheiden.'],
+    [['invalid_email', 'unable to validate email', 'invalid format'], 'Die E-Mail-Adresse ist ungültig.'],
+    [['over_email_send_rate_limit', 'email rate limit', 'over_request_rate_limit', 'rate limit', 'too many requests'], 'Zu viele Versuche. Bitte warte einen Moment und versuche es erneut.'],
+    [['user_not_found', 'user not found'], 'Kein Konto mit dieser E-Mail gefunden.'],
+    [['signups not allowed', 'signup_disabled', 'signups_disabled'], 'Registrierung ist derzeit nicht möglich.'],
+    [['otp_expired', 'token has expired', 'is invalid', 'expired'], 'Der Link ist abgelaufen oder ungültig. Bitte fordere einen neuen an.'],
+    [['provide your email', 'missing email', 'validation_failed'], 'Bitte gib eine gültige E-Mail-Adresse ein.'],
+  ];
+  for (let i = 0; i < map.length; i++) {
+    const keys = map[i][0];
+    if (keys.some(k => code === k || has(k))) return map[i][1];
+  }
+  return 'Anmeldung fehlgeschlagen. Bitte prüfe deine Eingaben und versuche es erneut.';
+};
+
 // Zuletzt gewählten Club merken: expliziter ?club= gewinnt und wird gespeichert;
 // fehlt er (nackte Domain, Login-Rücksprung, Marketing-Seite), wird der gemerkte
 // Club verwendet, damit man nicht auf den Default-Club zurückgeworfen wird.

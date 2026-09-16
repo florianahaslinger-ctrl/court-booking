@@ -107,7 +107,7 @@ async function submit() {
     if (!phone) { msg('Bitte gib deine Telefonnummer ein.'); $('#submitBtn').disabled = false; return; }
     if (!birthdate) { msg('Bitte gib dein Geburtsdatum ein.'); $('#submitBtn').disabled = false; return; }
     const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { full_name: name, phone, birthdate } } });
-    if (error) { msg(error.message); $('#submitBtn').disabled = false; return; }
+    if (error) { msg(window.CB.authErr(error)); $('#submitBtn').disabled = false; return; }
     // Falls Mitglied dieser E-Mail existiert: auth_uid verknüpfen (falls RLS erlaubt)
     if (data.user) {
       await sb.from('members').update({ auth_uid: data.user.id })
@@ -117,7 +117,7 @@ async function submit() {
     location.href = 'konto.html' + location.search;
   } else {
     const { error } = await sb.auth.signInWithPassword({ email, password: pw });
-    if (error) { msg('Anmeldung fehlgeschlagen: ' + error.message); $('#submitBtn').disabled = false; return; }
+    if (error) { msg(window.CB.authErr(error)); $('#submitBtn').disabled = false; return; }
     location.href = 'konto.html' + location.search;
   }
 }
