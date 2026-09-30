@@ -7,8 +7,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY")!;
 const SITE_URL = (Deno.env.get("CB_SITE_URL") ?? "http://localhost:8123").replace(/\/+$/, "");
-const FEE_PERCENT = Number(Deno.env.get("PLATFORM_FEE_PERCENT") ?? "3.5");
-const FEE_FIXED_CENTS = Number(Deno.env.get("PLATFORM_FEE_FIXED_CENTS") ?? "25");
+const FEE_PERCENT = Number(Deno.env.get("PLATFORM_FEE_PERCENT") ?? "0.7");
+const FEE_FIXED_CENTS = Number(Deno.env.get("PLATFORM_FEE_FIXED_CENTS") ?? "0");
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
